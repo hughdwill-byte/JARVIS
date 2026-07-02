@@ -43,6 +43,18 @@ _HARD_HINTS = (
 _HARD_LENGTH = 600  # chars — long pasted content usually means a real task
 
 
+def web_search_tool(cfg: Config) -> dict | None:
+    """Anthropic's server-side web search tool — lets the model look things up
+    (news, scores, docs) with no client-side execution. ~$0.01 per search."""
+    if not cfg.web_search_enabled:
+        return None
+    return {
+        "type": "web_search_20250305",
+        "name": "web_search",
+        "max_uses": cfg.web_search_max_uses,
+    }
+
+
 def _pick_model(cfg: Config, user_text: str, force_smart: bool = False) -> str:
     """Shared routing heuristics for every backend."""
     if force_smart:
@@ -103,12 +115,14 @@ class LLMClient:
         messages.append({"role": "user", "content": user_text})
 
         model = self.pick_model(user_text, force_smart)
+        search = web_search_tool(self.cfg)
         try:
             resp = self._client.messages.create(
                 model=model,
                 max_tokens=max_tokens or self.cfg.llm_max_tokens,
                 system=system,
                 messages=messages,
+                **({"tools": [search]} if search else {}),
             )
             return "".join(b.text for b in resp.content if b.type == "text").strip()
         except Exception as exc:
@@ -263,7 +277,9 @@ class ClaudeCodeClient:
                       "message only.\n\n" + "\n\n".join(lines) + f"\n\nUser: {user_text}")
         else:
             prompt = user_text
-        return self._run(prompt, system, self.pick_model(user_text, force_smart))
+        search_tools = ["WebSearch", "WebFetch"] if self.cfg.web_search_enabled else None
+        return self._run(prompt, system, self.pick_model(user_text, force_smart),
+                         allowed_tools=search_tools)
 
     def analyze_image_file(self, image_path: str, prompt: str) -> str:
         """Vision via Claude Code's Read tool (it can view image files)."""
@@ -282,11 +298,12 @@ class ClaudeCodeClient:
         """/agent via Claude Code's own tools. Read-only unless auto-approve is on
         (headless runs can't show per-action y/N prompts)."""
         if auto_approve:
-            allowed = ["Read", "Glob", "Grep", "Bash", "Edit", "Write"]
+            allowed = ["Read", "Glob", "Grep", "Bash", "Edit", "Write",
+                       "WebSearch", "WebFetch"]
             mode = "acceptEdits"
             system = AGENT_SYSTEM_PROMPT
         else:
-            allowed = ["Read", "Glob", "Grep"]
+            allowed = ["Read", "Glob", "Grep", "WebSearch", "WebFetch"]
             mode = None
             system = (AGENT_SYSTEM_PROMPT +
                       "\n\nNOTE: you currently have READ-ONLY access. If the task needs "

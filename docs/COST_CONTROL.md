@@ -18,6 +18,7 @@ One Anthropic API key. Rough per-action costs at current pricing:
 | Hard question / code help | Sonnet | ~$0.01–0.03 |
 | `/desk` or `/read` (one 1024px image) | Sonnet | ~$0.01–0.02 |
 | `/doc` PDF summary (capped at ~6k tokens) | Sonnet | ~$0.03–0.06 |
+| Web search (per search performed) | either | ~$0.01 + tokens |
 
 Realistic monthly estimates:
 

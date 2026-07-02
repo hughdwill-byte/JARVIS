@@ -89,12 +89,14 @@ study workflows and PDF/project features, is **[docs/USER_GUIDE.md](docs/USER_GU
   `/timetable`, `/cite`, `/doc` PDF summaries + follow-up Q&A.
 - **Help you build** — `/project` loads a code folder for Q&A, `/code` debugs with
   explanations, `/run` executes small Python snippets in a sandbox.
+- **Look things up** — *"this morning's F1 result?"*, *"what's the numpy function for…"*.
+  Built-in web search for anything current, on by default (toggle in Settings → AI Brain).
 - **Use your computer & apps — just by asking** — *"tidy my Downloads folder"*, *"check my
-  email for anything from my tutor"*, *"what's in my uni folder?"*. When a request needs
-  real action, JARVIS uses your files, shell, and connected apps (Gmail, calendar, … via
-  MCP) automatically, step by step — with approval prompts before anything risky, a folder
-  allowlist, and an "Actions taken" log on every reply. Setup & safety model:
-  [docs/COMPUTER_AND_APPS.md](docs/COMPUTER_AND_APPS.md).
+  email for anything from my tutor"*, *"start a Word doc with my essay outline"*. When a
+  request needs real action, JARVIS uses your files, shell, and connected apps (Gmail,
+  calendar, … via MCP) automatically, step by step — with approval prompts before anything
+  risky, a folder allowlist, and an "Actions taken" log on every reply. Setup & safety
+  model: [docs/COMPUTER_AND_APPS.md](docs/COMPUTER_AND_APPS.md).
 
 **What it won't do:** write assignments/essays for submission, answer quizzes or exams, or
 help disguise AI work as yours. It's a tutor, not a ghostwriter — it declines and offers the

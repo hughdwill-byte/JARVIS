@@ -84,6 +84,10 @@ class Config:
     dashboard_host: str = "127.0.0.1"
     dashboard_port: int = 8321
 
+    # Web search (Anthropic server-side tool; ~$0.01 per search + tokens)
+    web_search_enabled: bool = True
+    web_search_max_uses: int = 5
+
     # Agent mode (computer use + connected apps)
     agent_enabled: bool = True
     agent_max_steps: int = 15
@@ -160,6 +164,8 @@ def load_config(env_file: str | os.PathLike | None = None) -> Config:
         memory_context_turns=_int(os.getenv("MEMORY_CONTEXT_TURNS"), 12),
         dashboard_host=os.getenv("DASHBOARD_HOST", "127.0.0.1").strip(),
         dashboard_port=_int(os.getenv("DASHBOARD_PORT"), 8321),
+        web_search_enabled=_bool(os.getenv("WEB_SEARCH_ENABLED"), True),
+        web_search_max_uses=_int(os.getenv("WEB_SEARCH_MAX_USES"), 5),
         agent_enabled=_bool(os.getenv("AGENT_ENABLED"), True),
         agent_max_steps=_int(os.getenv("AGENT_MAX_STEPS"), 15),
         agent_auto_approve=_bool(os.getenv("AGENT_AUTO_APPROVE"), False),

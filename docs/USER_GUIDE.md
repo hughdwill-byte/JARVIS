@@ -113,13 +113,19 @@ Type `/help` anytime for this list inside the app.
 | `/code <question + pasted code>` | Explains the bug and *why*, then the minimal fix |
 | `/run <python>` | `/run print(sum(range(100)))` — sandboxed, 10s limit |
 
+### Looking things up — just ask
+
+JARVIS has web search built in (Settings → AI Brain → Web search): *"who won the game this
+morning?"*, *"current price of a Pi 5?"*, *"what changed in Python 3.13?"* — it searches,
+answers, and cites. About a cent per search on the API backend.
+
 ### Using your computer and apps — just ask
 
 No special command needed. When a request requires real action, JARVIS does it itself,
 step by step:
 
 > *"tidy my Downloads into subfolders by file type"* · *"check my email for anything from
-> my tutor this week"* · *"what's taking up space in my uni folder?"*
+> my tutor this week"* · *"start a Word doc with an outline for my ethics essay"*
 
 It reads folders and files, runs commands, and uses connected apps until the task is done.
 Before anything risky (writing a file, running a command, sending an email) it shows you

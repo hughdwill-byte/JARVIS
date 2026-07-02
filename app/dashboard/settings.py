@@ -50,6 +50,9 @@ SETTINGS_SCHEMA: list[dict] = [
             {"key": "LLM_MAX_TOKENS", "label": "Max reply length (tokens)", "type": "number",
              "min": 128, "max": 4096,
              "help": "Longer replies cost more. 1024 ≈ a few paragraphs."},
+            {"key": "WEB_SEARCH_ENABLED", "label": "Web search", "type": "toggle",
+             "help": "Lets JARVIS look things up (news, sports scores, prices, docs). "
+                     "Costs about 1 cent per search on the API backend."},
         ],
     },
     {

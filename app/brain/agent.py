@@ -24,7 +24,7 @@ import webbrowser
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
-from app.brain.llm_client import LLMClient
+from app.brain.llm_client import LLMClient, web_search_tool
 from app.config import Config
 from app.logger import get_logger
 from app.prompts import AGENT_SYSTEM_PROMPT, CHAT_TOOLS_ADDENDUM, SYSTEM_PROMPT
@@ -231,6 +231,9 @@ class Agent:
     def _loop(self, messages: list[dict], system: str, model: str,
               on_action: Callable[[str], None]) -> tuple[str, list[str]]:
         schemas = list(LOCAL_TOOL_SCHEMAS)
+        search = web_search_tool(self.cfg)
+        if search is not None:
+            schemas.append(search)  # server-side: the API runs searches itself
         if self.mcp is not None:
             schemas += self.mcp.tool_schemas()
         client = self.llm.raw
@@ -248,6 +251,12 @@ class Agent:
             except Exception as exc:
                 log.error("Agent LLM call failed: %s", exc)
                 return self.llm._explain_error(exc), actions
+
+            if resp.stop_reason == "pause_turn":
+                # A long-running server tool (web search) paused mid-turn:
+                # hand the partial content back and let it continue.
+                messages.append({"role": "assistant", "content": resp.content})
+                continue
 
             tool_uses = [b for b in resp.content if b.type == "tool_use"]
             if resp.stop_reason != "tool_use" or not tool_uses:

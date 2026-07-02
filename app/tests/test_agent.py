@@ -188,6 +188,34 @@ def test_declined_action_is_reported_not_executed(agent_cfg):
     assert any("(declined)" in a for a in actions)
 
 
+def test_web_search_tool_offered_when_enabled(agent_cfg):
+    cfg, _ws = agent_cfg
+    cfg.web_search_enabled = True
+    agent, client = _agent_with(cfg, [
+        SimpleNamespace(content=[_text("ok")], stop_reason="end_turn"),
+    ])
+    agent.run_conversation("who won this morning?")
+    names = [t.get("name") for t in client.calls[0]["tools"]]
+    assert "web_search" in names
+
+    cfg.web_search_enabled = False
+    agent2, client2 = _agent_with(cfg, [
+        SimpleNamespace(content=[_text("ok")], stop_reason="end_turn"),
+    ])
+    agent2.run_conversation("who won this morning?")
+    assert "web_search" not in [t.get("name") for t in client2.calls[0]["tools"]]
+
+
+def test_pause_turn_continues_loop(agent_cfg):
+    cfg, _ws = agent_cfg
+    paused = SimpleNamespace(content=[_text("searching…")], stop_reason="pause_turn")
+    done = SimpleNamespace(content=[_text("The score was 2-1.")], stop_reason="end_turn")
+    agent, client = _agent_with(cfg, [paused, done])
+    reply, actions = agent.run_conversation("this morning's score?")
+    assert reply == "The score was 2-1."
+    assert len(client.calls) == 2  # continued after the pause
+
+
 def test_reply_spoken_excludes_action_log():
     r = Reply("answer\n\nActions taken:\n  - stuff", speak_text="answer")
     assert r.spoken == "answer"
