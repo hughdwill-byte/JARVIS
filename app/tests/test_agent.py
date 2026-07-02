@@ -148,6 +148,7 @@ def test_conversation_without_tools_is_plain_chat(agent_cfg):
     assert reply == "Entropy measures disorder."
     assert actions == []
     assert "tools" in client.calls[0]  # tools offered, just not used
+    assert "Current date & time" in client.calls[0]["system"]  # model knows today
 
 
 def test_conversation_uses_tool_then_answers(agent_cfg):

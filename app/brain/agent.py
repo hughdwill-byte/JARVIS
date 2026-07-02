@@ -27,7 +27,12 @@ from typing import TYPE_CHECKING, Callable
 from app.brain.llm_client import LLMClient, web_search_tool
 from app.config import Config
 from app.logger import get_logger
-from app.prompts import AGENT_SYSTEM_PROMPT, CHAT_TOOLS_ADDENDUM, SYSTEM_PROMPT
+from app.prompts import (
+    AGENT_SYSTEM_PROMPT,
+    CHAT_TOOLS_ADDENDUM,
+    SYSTEM_PROMPT,
+    current_datetime_line,
+)
 
 if TYPE_CHECKING:
     from app.brain.mcp_client import MCPManager
@@ -206,7 +211,7 @@ class Agent:
                     "Settings -> AI Brain and press Save & Apply.")
         final, actions = self._loop(
             messages=[{"role": "user", "content": task}],
-            system=AGENT_SYSTEM_PROMPT,
+            system=AGENT_SYSTEM_PROMPT + "\n\n" + current_datetime_line(),
             model=self.cfg.llm_model_smart,
             on_action=on_action,
         )
@@ -221,7 +226,7 @@ class Agent:
     ) -> tuple[str, list[str]]:
         """Normal chat with tools available: JARVIS acts only when the request
         needs the computer/apps, otherwise it just answers. Returns (reply, actions)."""
-        system = SYSTEM_PROMPT + "\n\n" + CHAT_TOOLS_ADDENDUM
+        system = SYSTEM_PROMPT + "\n\n" + CHAT_TOOLS_ADDENDUM + "\n" + current_datetime_line()
         if context_block:
             system += "\n\n--- CURRENT CONTEXT ---\n" + context_block
         messages = list(history or []) + [{"role": "user", "content": user_text}]

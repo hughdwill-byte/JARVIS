@@ -25,7 +25,7 @@ import subprocess
 
 from app.config import Config
 from app.logger import get_logger
-from app.prompts import AGENT_SYSTEM_PROMPT, SYSTEM_PROMPT
+from app.prompts import AGENT_SYSTEM_PROMPT, SYSTEM_PROMPT, current_datetime_line
 
 log = get_logger("llm")
 
@@ -107,7 +107,7 @@ class LLMClient:
         if not self.available:
             return OFFLINE_NOTICE
 
-        system = SYSTEM_PROMPT
+        system = SYSTEM_PROMPT + "\n\n" + current_datetime_line()
         if context_block:
             system += "\n\n--- CURRENT CONTEXT ---\n" + context_block
 
@@ -267,7 +267,7 @@ class ClaudeCodeClient:
     def chat(self, user_text: str, history: list[dict] | None = None,
              context_block: str = "", force_smart: bool = False,
              max_tokens: int | None = None) -> str:
-        system = SYSTEM_PROMPT
+        system = SYSTEM_PROMPT + "\n\n" + current_datetime_line()
         if context_block:
             system += "\n\n--- CURRENT CONTEXT ---\n" + context_block
         if history:

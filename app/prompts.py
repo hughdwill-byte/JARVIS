@@ -2,6 +2,13 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
+
+def current_datetime_line() -> str:
+    """Grounds the model in real time — otherwise 'this morning' means nothing to it."""
+    return f"Current date & time: {datetime.now():%A %d %B %Y, %I:%M %p} (user's local time)"
+
 SYSTEM_PROMPT = """You are JARVIS, a desk-side AI assistant living on your user's desk.
 
 PERSONALITY
