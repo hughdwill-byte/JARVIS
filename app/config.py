@@ -70,10 +70,14 @@ class Config:
     wake_word_enabled: bool = False
     wake_word_model: str = "hey_jarvis"
     wake_word_threshold: float = 0.5
+    # After JARVIS answers, keep listening briefly so you can reply without
+    # saying the wake word again.
+    follow_up_listen: bool = True
 
     # TTS
     tts_provider: str = "pyttsx3"
     tts_rate: int = 180
+    tts_voice: str = ""  # system voice id; "" = OS default (pick in Settings)
     speaker_device_index: int | None = None  # None = system default output
 
     # Storage
@@ -157,8 +161,10 @@ def load_config(env_file: str | os.PathLike | None = None) -> Config:
         wake_word_enabled=_bool(os.getenv("WAKE_WORD_ENABLED"), False),
         wake_word_model=os.getenv("WAKE_WORD_MODEL", "hey_jarvis").strip(),
         wake_word_threshold=_float(os.getenv("WAKE_WORD_THRESHOLD"), 0.5),
+        follow_up_listen=_bool(os.getenv("FOLLOW_UP_LISTEN"), True),
         tts_provider=os.getenv("TTS_PROVIDER", "pyttsx3").strip().lower(),
         tts_rate=_int(os.getenv("TTS_RATE"), 180),
+        tts_voice=os.getenv("TTS_VOICE", "").strip(),
         speaker_device_index=_opt_int(os.getenv("SPEAKER_DEVICE_INDEX")),
         database_path=database_path,
         memory_context_turns=_int(os.getenv("MEMORY_CONTEXT_TURNS"), 12),

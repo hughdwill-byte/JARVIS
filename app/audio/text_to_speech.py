@@ -55,6 +55,12 @@ class Speaker:
                 # unreliable when reused across threads.
                 engine = pyttsx3.init()
                 engine.setProperty("rate", self.cfg.tts_rate)
+                if self.cfg.tts_voice:
+                    try:
+                        engine.setProperty("voice", self.cfg.tts_voice)
+                    except Exception:
+                        log.warning("Voice '%s' not found; using system default",
+                                    self.cfg.tts_voice)
                 self._engine = engine
                 if self.cfg.speaker_device_index is not None:
                     if self._speak_routed(engine, text):

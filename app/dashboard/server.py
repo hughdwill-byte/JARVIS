@@ -23,6 +23,7 @@ from app.dashboard import settings as settings_mod
 from app.dashboard.settings import (
     SETTINGS_SCHEMA,
     list_audio_devices,
+    list_tts_voices,
     mask_secret,
     read_env_values,
     scan_cameras,
@@ -149,6 +150,7 @@ def create_app(cfg: Config, assistant: Assistant | None = None,
             "schema": SETTINGS_SCHEMA,
             "values": values,
             "audio": list_audio_devices(),
+            "voices": list_tts_voices(),
         })
 
     @app.post("/api/settings")

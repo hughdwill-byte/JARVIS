@@ -34,9 +34,11 @@ Close the window to stop JARVIS completely (mic and camera included).
 Three ways, all equivalent — pick per moment:
 
 1. **Hands-free:** say **"jarvis"** (or "hey jarvis"), wait for the beep, then speak
-   naturally: *"jarvis… what's on my desk?"*, *"jarvis… explain recursion simply"*,
-   *"jarvis… add a task to email my tutor"* (that one needs the command form for now —
-   say or type `/task email tutor`). Your words and its reply appear in the chat with a 🎤.
+   naturally: *"jarvis… what's on my desk?"*, *"jarvis… explain recursion simply"*.
+   After it answers, **just keep talking** — it listens for ~6 seconds after each reply
+   so you can go back and forth without repeating the wake word (say nothing to end the
+   conversation, or turn this off: Settings → Hands-free → Conversation mode). Your words
+   and its replies appear in the chat with a 🎤.
 2. **Typing:** just type in the chat box. Anything without a leading `/` is normal
    conversation.
 3. **Push-to-talk (terminal only):** type `/voice`, speak, press Enter.

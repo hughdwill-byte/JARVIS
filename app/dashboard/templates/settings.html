@@ -40,7 +40,7 @@
   <div id="toast"></div>
 
 <script>
-let schema = null, values = {}, audio = {inputs: [], outputs: []};
+let schema = null, values = {}, audio = {inputs: [], outputs: []}, voices = [];
 const root = document.getElementById('settings-root');
 
 function toast(msg, ok = true) {
@@ -55,7 +55,8 @@ function deviceOptions(list, current, extraLabel) {
   list.forEach(d => {
     const sel = String(d.index) === String(current) ? 'selected' : '';
     const star = d.default ? ' ★' : '';
-    html += `<option value="${d.index}" ${sel}>[${d.index}] ${d.name}${star}</option>`;
+    const prefix = (typeof d.index === 'number') ? `[${d.index}] ` : '';
+    html += `<option value="${String(d.index).replace(/"/g, '&quot;')}" ${sel}>${prefix}${d.name}${star}</option>`;
   });
   return html;
 }
@@ -88,6 +89,7 @@ function fieldHtml(item) {
       let opts = '';
       if (item.source === 'mic_devices') opts = deviceOptions(audio.inputs, v);
       else if (item.source === 'speaker_devices') opts = deviceOptions(audio.outputs, v);
+      else if (item.source === 'tts_voices') opts = deviceOptions(voices, v);
       else if (item.source === 'cameras') {
         opts = `<option value="${v}" selected>Camera ${v || 0} (current)</option>`;
       } else {
@@ -97,8 +99,9 @@ function fieldHtml(item) {
       }
       const scanBtn = item.source === 'cameras'
         ? `<button class="mini" onclick="scanCameras()">Scan for cameras</button>` : '';
-      const rescan = (item.source === 'mic_devices' || item.source === 'speaker_devices')
-        ? `<button class="mini" onclick="loadSettings(true)">Rescan devices</button>` : '';
+      const rescan = (item.source === 'mic_devices' || item.source === 'speaker_devices'
+                      || item.source === 'tts_voices')
+        ? `<button class="mini" onclick="loadSettings(true)">Rescan</button>` : '';
       control = `<div class="select-row"><select id="${id}">${opts}</select>${scanBtn}${rescan}</div>`;
       break;
     }
@@ -137,6 +140,7 @@ async function loadSettings(isRescan) {
   try {
     const data = await (await fetch('/api/settings')).json();
     schema = data.schema; values = data.values; audio = data.audio;
+    voices = data.voices || [];
     render();
     if (isRescan) toast('Audio devices rescanned.');
   } catch (e) {

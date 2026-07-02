@@ -84,8 +84,15 @@ SETTINGS_SCHEMA: list[dict] = [
              "help": "Lower = easier to trigger (more false alarms from TV/music). "
                      "Raise to 0.6 if it self-triggers; lower to 0.4 if it misses you."},
             {"key": "WAKE_WORD_MODEL", "label": "Wake phrase", "type": "select",
-             "choices": ["hey_jarvis", "alexa", "hey_mycroft"],
-             "help": "hey_jarvis also fires on a clear 'jarvis'."},
+             "choices": ["hey_jarvis", "alexa", "hey_mycroft", "hey_rhasspy"],
+             "help": "hey_jarvis fires on BOTH 'hey jarvis' and a clear 'jarvis' — it's "
+                     "the one you want. The others are alternative pre-trained phrases "
+                     "('alexa', 'hey mycroft', 'hey rhasspy'). Fully custom phrases would "
+                     "need training a detection model (openwakeword docs) — not built in."},
+            {"key": "FOLLOW_UP_LISTEN", "label": "Conversation mode", "type": "toggle",
+             "help": "After JARVIS answers, it keeps listening ~6 seconds so you can reply "
+                     "without saying the wake phrase again. Stay quiet to end the "
+                     "conversation."},
         ],
     },
     {
@@ -99,6 +106,12 @@ SETTINGS_SCHEMA: list[dict] = [
             {"key": "TTS_PROVIDER", "label": "Voice output", "type": "select",
              "choices": ["pyttsx3", "none"],
              "help": "pyttsx3 = free offline voice. none = silent, text-only replies."},
+            {"key": "TTS_VOICE", "label": "Voice", "type": "select",
+             "source": "tts_voices",
+             "help": "Your operating system's speech voices. macOS tip: get much nicer "
+                     "ones free via System Settings → Accessibility → Spoken Content → "
+                     "System voice → Manage Voices — download an 'Enhanced'/'Premium' "
+                     "voice, then Rescan here and pick it."},
             {"key": "TTS_RATE", "label": "Speaking speed (words/min)", "type": "slider",
              "min": 120, "max": 230, "step": 5,
              "help": "160–190 sounds most natural."},
@@ -261,6 +274,33 @@ def list_audio_devices() -> dict:
         if d["max_output_channels"] > 0:
             outputs.append({**entry, "default": i == default_out})
     return {"inputs": inputs, "outputs": outputs, "error": None}
+
+
+def list_tts_voices() -> list[dict]:
+    """System speech voices for the Settings dropdown (name shown, id stored)."""
+    try:
+        import pyttsx3
+    except ImportError:
+        return []
+    try:
+        engine = pyttsx3.init()
+        voices = engine.getProperty("voices") or []
+        out = []
+        for v in voices:
+            langs = getattr(v, "languages", None)
+            lang = ""
+            if langs:
+                first = langs[0]
+                lang = f" ({first.decode() if isinstance(first, bytes) else first})"
+            out.append({"index": v.id, "name": f"{v.name}{lang}"})
+        try:
+            engine.stop()
+        except Exception:
+            pass
+        return out
+    except Exception as exc:
+        log.warning("Could not list TTS voices: %s", exc)
+        return []
 
 
 def scan_cameras(max_index: int = 5) -> dict:

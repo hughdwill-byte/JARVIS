@@ -148,7 +148,11 @@ def test_conversation_without_tools_is_plain_chat(agent_cfg):
     assert reply == "Entropy measures disorder."
     assert actions == []
     assert "tools" in client.calls[0]  # tools offered, just not used
-    assert "Current date & time" in client.calls[0]["system"]  # model knows today
+    system = client.calls[0]["system"]
+    # prompt caching: static persona block is cache-marked, dynamic date block isn't
+    assert system[0]["cache_control"] == {"type": "ephemeral"}
+    assert "Current date & time" in system[-1]["text"]  # model knows today
+    assert "cache_control" not in system[-1]
 
 
 def test_conversation_uses_tool_then_answers(agent_cfg):

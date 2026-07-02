@@ -43,6 +43,26 @@ _HARD_HINTS = (
 _HARD_LENGTH = 600  # chars — long pasted content usually means a real task
 
 
+def cached_system(static: str, dynamic: str = "") -> list[dict]:
+    """System prompt as blocks with prompt caching on the static part.
+
+    The static prefix (persona + rules, identical on every call) gets a
+    cache_control breakpoint: the API stores it for ~5 minutes and re-reads
+    cost 10% of normal input price — a big win for back-and-forth voice chat.
+    Dynamic content (date, tasks, desk context) stays in an uncached block so
+    it never breaks the cache. See:
+    https://platform.claude.com/docs/en/build-with-claude/prompt-caching
+    """
+    blocks: list[dict] = [{
+        "type": "text",
+        "text": static,
+        "cache_control": {"type": "ephemeral"},
+    }]
+    if dynamic:
+        blocks.append({"type": "text", "text": dynamic})
+    return blocks
+
+
 def web_search_tool(cfg: Config) -> dict | None:
     """Anthropic's server-side web search tool — lets the model look things up
     (news, scores, docs) with no client-side execution. ~$0.01 per search."""
@@ -107,9 +127,10 @@ class LLMClient:
         if not self.available:
             return OFFLINE_NOTICE
 
-        system = SYSTEM_PROMPT + "\n\n" + current_datetime_line()
+        dynamic = current_datetime_line()
         if context_block:
-            system += "\n\n--- CURRENT CONTEXT ---\n" + context_block
+            dynamic += "\n\n--- CURRENT CONTEXT ---\n" + context_block
+        system = cached_system(SYSTEM_PROMPT, dynamic)
 
         messages = list(history or [])
         messages.append({"role": "user", "content": user_text})
@@ -137,7 +158,7 @@ class LLMClient:
             resp = self._client.messages.create(
                 model=self.cfg.llm_model_smart,
                 max_tokens=self.cfg.llm_max_tokens,
-                system=SYSTEM_PROMPT,
+                system=cached_system(SYSTEM_PROMPT),
                 messages=[{
                     "role": "user",
                     "content": [

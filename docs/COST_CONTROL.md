@@ -30,6 +30,10 @@ Set a hard spending limit in the Anthropic console (Settings → Limits) — do 
 
 ## How the code keeps costs down (already built in)
 
+- **Prompt caching**: the persona/tool instructions (the biggest fixed chunk of every
+  request) carry an Anthropic cache breakpoint — within a 5-minute window, repeat calls
+  re-read that prefix at 10% of normal input price. Back-and-forth conversation is where
+  this saves most (roughly 30–60% off input costs in an active session).
 - Cheap model by default; smart model only for images, documents, and hard-task heuristics.
 - Images downscaled to ≤1024px JPEG before upload; scene *diffs* computed locally from text.
 - Conversation context trimmed (`MEMORY_CONTEXT_TURNS=12`), replies capped (`LLM_MAX_TOKENS=1024`).

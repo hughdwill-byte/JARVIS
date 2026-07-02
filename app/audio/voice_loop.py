@@ -40,6 +40,7 @@ except ImportError:
 SAMPLE_RATE = 16000          # required by both openwakeword and whisper
 SPEECH_RMS = 0.010           # rough voice-activity threshold (float32 scale)
 START_TIMEOUT_S = 6.0        # give up if you say "jarvis" then nothing
+FOLLOW_UP_WINDOW_S = 6.0     # reply window after JARVIS speaks (no wake word needed)
 MAX_UTTERANCE_S = 15.0
 END_SILENCE_S = 1.2          # stop recording after this much quiet
 
@@ -155,29 +156,49 @@ class VoiceLoop(threading.Thread):
     def _handle_wake(self, stream) -> None:
         print("\n  [JARVIS] Yes? (listening...)")
         self._chime()
-        audio = self._record_utterance(stream)
+        spoke = self._one_exchange(stream, START_TIMEOUT_S, first=True)
+        # Conversation mode: after each spoken reply, keep listening briefly so
+        # the user can respond without saying the wake word again.
+        while (spoke and self.cfg.follow_up_listen
+               and not self._stop and self._listen.is_set()):
+            self.assistant.speaker.wait()  # let JARVIS finish talking first
+            self._drain(stream)
+            print("  [still listening — reply now, or stay quiet to end]")
+            spoke = self._one_exchange(stream, FOLLOW_UP_WINDOW_S, first=False)
+        if not self._stop and self._listen.is_set():
+            print("  [conversation closed — say 'jarvis' anytime]")
+
+    def _one_exchange(self, stream, start_timeout: float, first: bool) -> bool:
+        """Record one utterance and answer it. Returns True if a reply was spoken
+        (i.e. the conversation should stay open)."""
+        audio = self._record_utterance(stream, start_timeout)
         if audio is None:
-            print("  Didn't catch anything — say 'jarvis' to try again.")
-            return
+            if first:
+                print("  Didn't catch anything — say 'jarvis' to try again.")
+            return False
         text = self.assistant.transcriber.transcribe_array(audio, SAMPLE_RATE)
         if not text:
-            print("  Couldn't make that out — say 'jarvis' and try again.")
-            return
+            if first:
+                print("  Couldn't make that out — say 'jarvis' and try again.")
+            return False
         print(f"\nyou (voice)> {text}")
         self.assistant.record_activity("user_voice", text)
         if is_sleep_phrase(text):
             self.go_to_sleep()
             self.assistant.record_activity("assistant", "Microphone off. Type anything to re-enable.")
             self.assistant.speaker.speak("Going quiet. Type anything when you need me.")
-            return
+            return False
         reply = self.assistant.handle(text)
         if reply.text:
             print(f"\njarvis> {reply.text}\n")
             self.assistant.record_activity("assistant", reply.text)
             if reply.speak:
                 self.assistant.speaker.speak(reply.spoken)
+                return True
+        return False
 
-    def _record_utterance(self, stream) -> "np.ndarray | None":
+    def _record_utterance(self, stream,
+                          start_timeout: float = START_TIMEOUT_S) -> "np.ndarray | None":
         """Record until you finish talking (silence-based endpointing)."""
         chunks: list = []
         started = False
@@ -193,7 +214,7 @@ class VoiceLoop(threading.Thread):
                 if rms >= SPEECH_RMS:
                     started = True
                     chunks.append(audio)
-                elif waited >= START_TIMEOUT_S:
+                elif waited >= start_timeout:
                     return None
                 continue
             chunks.append(audio)

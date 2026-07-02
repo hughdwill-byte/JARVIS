@@ -24,7 +24,7 @@ import webbrowser
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
-from app.brain.llm_client import LLMClient, web_search_tool
+from app.brain.llm_client import LLMClient, cached_system, web_search_tool
 from app.config import Config
 from app.logger import get_logger
 from app.prompts import (
@@ -211,7 +211,7 @@ class Agent:
                     "Settings -> AI Brain and press Save & Apply.")
         final, actions = self._loop(
             messages=[{"role": "user", "content": task}],
-            system=AGENT_SYSTEM_PROMPT + "\n\n" + current_datetime_line(),
+            system=cached_system(AGENT_SYSTEM_PROMPT, current_datetime_line()),
             model=self.cfg.llm_model_smart,
             on_action=on_action,
         )
@@ -226,14 +226,15 @@ class Agent:
     ) -> tuple[str, list[str]]:
         """Normal chat with tools available: JARVIS acts only when the request
         needs the computer/apps, otherwise it just answers. Returns (reply, actions)."""
-        system = SYSTEM_PROMPT + "\n\n" + CHAT_TOOLS_ADDENDUM + "\n" + current_datetime_line()
+        dynamic = current_datetime_line()
         if context_block:
-            system += "\n\n--- CURRENT CONTEXT ---\n" + context_block
+            dynamic += "\n\n--- CURRENT CONTEXT ---\n" + context_block
+        system = cached_system(SYSTEM_PROMPT + "\n\n" + CHAT_TOOLS_ADDENDUM, dynamic)
         messages = list(history or []) + [{"role": "user", "content": user_text}]
         # Cheap model for the first look; escalates to the smart model once it acts.
         return self._loop(messages, system, self.llm.pick_model(user_text), on_action)
 
-    def _loop(self, messages: list[dict], system: str, model: str,
+    def _loop(self, messages: list[dict], system: list[dict], model: str,
               on_action: Callable[[str], None]) -> tuple[str, list[str]]:
         schemas = list(LOCAL_TOOL_SCHEMAS)
         search = web_search_tool(self.cfg)
