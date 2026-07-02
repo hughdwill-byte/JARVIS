@@ -265,11 +265,28 @@ class Assistant:
         return self.mcp.status_text()
 
     # --- status / reminders ----------------------------------------------
+    @staticmethod
+    def code_version() -> str:
+        """Short git commit of the running code — proves which version is live."""
+        try:
+            import subprocess
+            from app.config import PROJECT_ROOT
+            out = subprocess.run(
+                ["git", "log", "-1", "--format=%h %s"], capture_output=True,
+                text=True, timeout=5, cwd=PROJECT_ROOT,
+            )
+            return out.stdout.strip() or "unknown (not a git checkout)"
+        except Exception:
+            return "unknown (git not available)"
+
     def status_text(self) -> str:
         def mark(ok: bool) -> str:
             return "OK " if ok else "-- "
         return "\n".join([
             "Component status:",
+            f"  Code version: {self.code_version()}",
+            f"  [{mark(self.cfg.web_search_enabled)}] Web search"
+            + ("" if self.cfg.web_search_enabled else " — off (Settings -> AI Brain)"),
             f"  [{mark(self.llm.available)}] AI brain — {self.llm.describe()}",
             f"  [{mark(self.camera.available)}] Camera (index {self.cfg.camera_index})"
             + ("" if self.camera.available else " — pip install opencv-python"),
