@@ -43,6 +43,12 @@ log = get_logger("assistant")
 class Reply:
     text: str
     speak: bool = True  # whether TTS should read this aloud
+    # If set, TTS reads this instead of `text` (used to skip the action log).
+    speak_text: str | None = None
+
+    @property
+    def spoken(self) -> str:
+        return self.speak_text if self.speak_text is not None else self.text
 
 
 class Assistant:
@@ -71,9 +77,12 @@ class Assistant:
         # Hands-free mode: created here, started by the front-end (run_assistant).
         self.voice_loop = VoiceLoop(self) if cfg.wake_word_enabled else None
 
-        # Agent mode (computer use + connected apps). MCP servers connect lazily
-        # on first /agent or /apps so boot stays fast.
+        # Agent mode (computer use + connected apps). Connected-app servers start
+        # in the background at boot so normal conversation can use them right away.
         self.mcp = MCPManager(cfg)
+        if cfg.agent_enabled and self.mcp.config_exists():
+            threading.Thread(target=self.mcp.ensure_started, daemon=True,
+                             name="jarvis-mcp-boot").start()
         # Front-ends may replace this with an interactive y/N prompt.
         self.approval_callback = self._default_approval
 
@@ -268,6 +277,10 @@ class Assistant:
                else (" — off (use /listen)" if self.voice_loop and self.voice_loop.available
                      else " — " + (self.voice_loop.why_unavailable() if self.voice_loop
                                    else "set WAKE_WORD_ENABLED=true in .env"))),
+            f"  [{mark(self.cfg.agent_enabled and self.llm.available)}] "
+            "Computer & apps (used automatically in chat when needed)"
+            + (f" — folders: {self.cfg.agent_allowed_dirs}" if self.cfg.agent_enabled
+               else " — off (Settings -> Computer & Apps)"),
             f"  Database: {self.cfg.database_path}",
             f"  Snapshot retention: {self.cfg.snapshot_retention_days} day(s)",
         ])
@@ -324,10 +337,29 @@ class Assistant:
             preferences=self.prefs.as_context(),
         )
         history = self.db.recent_messages(self.cfg.memory_context_turns)
-        reply_text = self.llm.chat(user_text, history=history, context_block=context)
+
+        # Normal conversation is tool-capable: JARVIS uses the computer/apps by
+        # itself when the request needs it, and just talks when it doesn't.
+        speak_text = None
+        if self.cfg.agent_enabled and self.llm.available:
+            agent = Agent(self.cfg, self.llm, AgentTools(self.cfg),
+                          self.approval_callback, self.mcp)
+            try:
+                final, actions = agent.run_conversation(user_text, history, context)
+            except Exception:
+                log.exception("Tool-capable chat failed; falling back to plain chat")
+                final, actions = self.llm.chat(user_text, history=history,
+                                               context_block=context), []
+            reply_text = final
+            if actions:
+                reply_text += "\n\nActions taken:\n" + "\n".join(f"  - {a}" for a in actions)
+                speak_text = final  # don't read the action log aloud
+        else:
+            reply_text = self.llm.chat(user_text, history=history, context_block=context)
+
         self.db.add_message("user", user_text)
         self.db.add_message("assistant", reply_text)
-        return Reply(reply_text)
+        return Reply(reply_text, speak_text=speak_text)
 
     def close(self) -> None:
         if self.voice_loop is not None:

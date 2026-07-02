@@ -27,7 +27,7 @@ from typing import TYPE_CHECKING, Callable
 from app.brain.llm_client import LLMClient
 from app.config import Config
 from app.logger import get_logger
-from app.prompts import AGENT_SYSTEM_PROMPT
+from app.prompts import AGENT_SYSTEM_PROMPT, CHAT_TOOLS_ADDENDUM, SYSTEM_PROMPT
 
 if TYPE_CHECKING:
     from app.brain.mcp_client import MCPManager
@@ -200,44 +200,69 @@ class Agent:
         self.mcp = mcp
 
     def run(self, task: str, on_action: Callable[[str], None] = print) -> str:
+        """Explicit /agent invocation: task-focused prompt, smart model, action log."""
         if not self.llm.available:
             return ("Agent mode needs the LLM — add your Anthropic API key in "
                     "Settings -> AI Brain and press Save & Apply.")
+        final, actions = self._loop(
+            messages=[{"role": "user", "content": task}],
+            system=AGENT_SYSTEM_PROMPT,
+            model=self.cfg.llm_model_smart,
+            on_action=on_action,
+        )
+        return self._with_action_log(final, actions)
+
+    def run_conversation(
+        self,
+        user_text: str,
+        history: list[dict] | None = None,
+        context_block: str = "",
+        on_action: Callable[[str], None] = print,
+    ) -> tuple[str, list[str]]:
+        """Normal chat with tools available: JARVIS acts only when the request
+        needs the computer/apps, otherwise it just answers. Returns (reply, actions)."""
+        system = SYSTEM_PROMPT + "\n\n" + CHAT_TOOLS_ADDENDUM
+        if context_block:
+            system += "\n\n--- CURRENT CONTEXT ---\n" + context_block
+        messages = list(history or []) + [{"role": "user", "content": user_text}]
+        # Cheap model for the first look; escalates to the smart model once it acts.
+        return self._loop(messages, system, self.llm.pick_model(user_text), on_action)
+
+    def _loop(self, messages: list[dict], system: str, model: str,
+              on_action: Callable[[str], None]) -> tuple[str, list[str]]:
         schemas = list(LOCAL_TOOL_SCHEMAS)
         if self.mcp is not None:
             schemas += self.mcp.tool_schemas()
-
         client = self.llm.raw
-        messages: list[dict] = [{"role": "user", "content": task}]
         actions: list[str] = []
 
         for _step in range(self.cfg.agent_max_steps):
             try:
                 resp = client.messages.create(
-                    model=self.cfg.llm_model_smart,
+                    model=model,
                     max_tokens=2048,
-                    system=AGENT_SYSTEM_PROMPT,
+                    system=system,
                     tools=schemas,
                     messages=messages,
                 )
             except Exception as exc:
                 log.error("Agent LLM call failed: %s", exc)
-                return self.llm._explain_error(exc)
+                return self.llm._explain_error(exc), actions
 
             tool_uses = [b for b in resp.content if b.type == "tool_use"]
             if resp.stop_reason != "tool_use" or not tool_uses:
                 final = "".join(b.text for b in resp.content if b.type == "text").strip()
-                return self._with_action_log(final, actions)
+                return final, actions
 
+            model = self.cfg.llm_model_smart  # multi-step work deserves the smart model
             messages.append({"role": "assistant", "content": resp.content})
             results = []
             for block in tool_uses:
                 results.append(self._execute_one(block, actions, on_action))
             messages.append({"role": "user", "content": results})
 
-        return self._with_action_log(
-            "I hit the step limit before finishing — here's where I got to. "
-            "You can raise the limit in Settings -> Computer & Apps.", actions)
+        return ("I hit the step limit before finishing — here's where I got to. "
+                "You can raise the limit in Settings -> Computer & Apps."), actions
 
     def _execute_one(self, block, actions: list[str], on_action) -> dict:
         name, args = block.name, dict(block.input or {})

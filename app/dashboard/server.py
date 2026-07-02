@@ -77,7 +77,7 @@ def create_app(cfg: Config, assistant: Assistant | None = None,
             finally:
                 state["camera_active"] = False
         if reply.text and reply.speak:
-            bot().speaker.speak(reply.text)
+            bot().speaker.speak(reply.spoken)
         return jsonify({"reply": reply.text})
 
     @app.get("/api/state")

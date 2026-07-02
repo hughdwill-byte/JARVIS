@@ -113,11 +113,12 @@ SETTINGS_SCHEMA: list[dict] = [
         ],
     },
     {
-        "section": "Computer & Apps (agent mode)",
-        "blurb": "/agent lets JARVIS complete tasks using this computer (files, commands) "
-                 "and connected apps like email or calendar (set up via mcp_servers.json — "
-                 "see docs/COMPUTER_AND_APPS.md). Risky actions always ask you first unless "
-                 "you opt in below.",
+        "section": "Computer & Apps",
+        "blurb": "When a request needs it, JARVIS completes tasks using this computer "
+                 "(files, commands) and connected apps like email or calendar (set up via "
+                 "mcp_servers.json — see docs/COMPUTER_AND_APPS.md) — automatically, in "
+                 "normal conversation. Risky actions always ask you first unless you opt "
+                 "in below.",
         "items": [
             {"key": "AGENT_ENABLED", "label": "Agent mode", "type": "toggle",
              "help": "Off = /agent is disabled entirely; JARVIS can't touch files or apps."},

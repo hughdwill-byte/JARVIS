@@ -113,18 +113,27 @@ Type `/help` anytime for this list inside the app.
 | `/code <question + pasted code>` | Explains the bug and *why*, then the minimal fix |
 | `/run <python>` | `/run print(sum(range(100)))` — sandboxed, 10s limit |
 
-### Using your computer and apps (agent mode)
-| Command | Example |
+### Using your computer and apps — just ask
+
+No special command needed. When a request requires real action, JARVIS does it itself,
+step by step:
+
+> *"tidy my Downloads into subfolders by file type"* · *"check my email for anything from
+> my tutor this week"* · *"what's taking up space in my uni folder?"*
+
+It reads folders and files, runs commands, and uses connected apps until the task is done.
+Before anything risky (writing a file, running a command, sending an email) it shows you
+exactly what it wants to do and waits for your y/N in the terminal; every reply that took
+actions ends with an "Actions taken" list (shown on screen, not read aloud). Plain
+questions never touch tools.
+
+| Command | Purpose |
 |---|---|
-| `/agent <task>` | `/agent tidy my Downloads into subfolders by file type` · `/agent check my email for anything from my tutor this week` |
+| `/agent <task>` | Optional: *force* task mode explicitly |
 | `/apps` | List connected apps (Gmail, calendar, …) and their status |
 
-Agent mode is JARVIS actually *doing* things: it reads folders and files, runs commands,
-and uses connected apps, step by step, until the task is done. Before anything risky
-(writing a file, running a command, sending an email) it shows you exactly what it wants
-to do and waits for your y/N in the terminal; every reply ends with a full "Actions taken"
-list. Which folders it may touch — and the off switch — live in **Settings → Computer &
-Apps**. Connecting Gmail/calendar takes one config file and a one-time login:
+Which folders it may touch — and the off switch — live in **Settings → Computer & Apps**.
+Connecting Gmail/calendar takes one config file and a one-time login:
 [`COMPUTER_AND_APPS.md`](COMPUTER_AND_APPS.md).
 
 ### Control

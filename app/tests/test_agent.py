@@ -1,11 +1,13 @@
-"""Agent mode: path sandboxing, approval gating, MCP config parsing, wiring."""
+"""Agent mode: path sandboxing, approval gating, tool loop, MCP config, wiring."""
 
 import json
+from types import SimpleNamespace
 
 import pytest
 
-from app.assistant import Assistant
-from app.brain.agent import AgentTools, ToolError, describe_action, needs_approval
+from app.assistant import Assistant, Reply
+from app.brain.agent import Agent, AgentTools, ToolError, describe_action, needs_approval
+from app.brain.llm_client import LLMClient
 from app.brain.mcp_client import load_mcp_config
 from app.config import Config, load_config
 
@@ -106,6 +108,90 @@ def test_load_mcp_config_errors(tmp_path):
     no_cmd.write_text(json.dumps({"mcpServers": {"x": {"args": []}}}))
     with pytest.raises(ValueError, match="command"):
         load_mcp_config(no_cmd)
+
+
+# --- the tool loop (with a fake API client) ---------------------------------------
+
+def _text(t):
+    return SimpleNamespace(type="text", text=t)
+
+
+def _tool_use(name, args, id="tu_1"):
+    return SimpleNamespace(type="tool_use", name=name, input=args, id=id)
+
+
+class FakeClient:
+    """Stands in for the Anthropic client: returns scripted responses in order."""
+
+    def __init__(self, responses):
+        self._responses = list(responses)
+        self.calls = []
+        self.messages = self  # so client.messages.create(...) works
+
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
+        return self._responses.pop(0)
+
+
+def _agent_with(cfg, responses, approve=lambda name, desc: True):
+    llm = LLMClient(cfg)
+    llm._client = FakeClient(responses)  # inject the fake; llm.available becomes True
+    return Agent(cfg, llm, AgentTools(cfg), approve), llm._client
+
+
+def test_conversation_without_tools_is_plain_chat(agent_cfg):
+    cfg, _ws = agent_cfg
+    agent, client = _agent_with(cfg, [
+        SimpleNamespace(content=[_text("Entropy measures disorder.")], stop_reason="end_turn"),
+    ])
+    reply, actions = agent.run_conversation("explain entropy")
+    assert reply == "Entropy measures disorder."
+    assert actions == []
+    assert "tools" in client.calls[0]  # tools offered, just not used
+
+
+def test_conversation_uses_tool_then_answers(agent_cfg):
+    cfg, ws = agent_cfg
+    (ws / "essay.txt").write_text("draft")
+    agent, client = _agent_with(cfg, [
+        SimpleNamespace(content=[_tool_use("list_dir", {"path": str(ws)})],
+                        stop_reason="tool_use"),
+        SimpleNamespace(content=[_text("You have one file: essay.txt.")],
+                        stop_reason="end_turn"),
+    ])
+    reply, actions = agent.run_conversation("what's in my workspace?")
+    assert "essay.txt" in reply
+    assert len(actions) == 1
+    # the second call must include the tool result for the first
+    second = client.calls[1]["messages"]
+    tool_results = [
+        part for m in second if isinstance(m.get("content"), list)
+        for part in m["content"]
+        if isinstance(part, dict) and part.get("type") == "tool_result"
+    ]
+    assert tool_results and "essay.txt" in tool_results[0]["content"]
+    # and escalates to the smart model once acting
+    assert client.calls[1]["model"] == cfg.llm_model_smart
+
+
+def test_declined_action_is_reported_not_executed(agent_cfg):
+    cfg, ws = agent_cfg
+    agent, _client = _agent_with(cfg, [
+        SimpleNamespace(content=[_tool_use("write_file",
+                                           {"path": str(ws / "x.txt"), "content": "hi"})],
+                        stop_reason="tool_use"),
+        SimpleNamespace(content=[_text("Okay, I won't write the file.")],
+                        stop_reason="end_turn"),
+    ], approve=lambda name, desc: False)
+    reply, actions = agent.run_conversation("make a file")
+    assert not (ws / "x.txt").exists()
+    assert any("(declined)" in a for a in actions)
+
+
+def test_reply_spoken_excludes_action_log():
+    r = Reply("answer\n\nActions taken:\n  - stuff", speak_text="answer")
+    assert r.spoken == "answer"
+    assert Reply("plain").spoken == "plain"
 
 
 # --- assistant wiring ------------------------------------------------------------

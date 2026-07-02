@@ -175,7 +175,7 @@ class VoiceLoop(threading.Thread):
             print(f"\njarvis> {reply.text}\n")
             self.assistant.record_activity("assistant", reply.text)
             if reply.speak:
-                self.assistant.speaker.speak(reply.text)
+                self.assistant.speaker.speak(reply.spoken)
 
     def _record_utterance(self, stream) -> "np.ndarray | None":
         """Record until you finish talking (silence-based endpointing)."""

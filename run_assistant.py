@@ -99,7 +99,7 @@ def main() -> int:
             if reply.text:
                 print(f"\njarvis> {reply.text}\n")
                 if reply.speak:
-                    assistant.speaker.speak(reply.text)
+                    assistant.speaker.speak(reply.spoken)
     except KeyboardInterrupt:
         print()
     finally:

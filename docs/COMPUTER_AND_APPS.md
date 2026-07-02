@@ -1,7 +1,8 @@
-# Agent mode — using your computer and your apps
+# Using your computer and your apps
 
-`/agent <task>` puts JARVIS in Cowork-style agent mode: it plans, uses tools, checks the
-results, and keeps going until the task is done. Two kinds of tools are available to it:
+Just ask — no special command. When a request needs real action or real information,
+JARVIS automatically works in steps: it plans, uses tools, checks the results, and keeps
+going until the task is done. Two kinds of tools are available to it:
 
 1. **Your computer** (built in): list folders, read files, write files, run shell commands,
    open apps/URLs.
@@ -9,11 +10,15 @@ results, and keeps going until the task is done. Two kinds of tools are availabl
    connector ecosystem Claude uses.
 
 ```
-/agent tidy my Downloads folder into subfolders by file type
-/agent check my email for anything from my tutor this week and summarise it
-/agent find every PDF mentioning thermodynamics in my uni folder and list them
-/agent draft a reply to the latest email from the lab group (it will ask before sending)
+tidy my Downloads folder into subfolders by file type
+check my email for anything from my tutor this week and summarise it
+find every PDF mentioning thermodynamics in my uni folder and list them
+draft a reply to the latest email from the lab group   (it will ask before sending)
 ```
+
+Plain questions ("explain entropy") don't touch any tools — it just answers.
+`/agent <task>` still exists if you want to *force* task mode explicitly, and `/apps`
+shows which apps are connected.
 
 ## About API keys (read this once)
 
