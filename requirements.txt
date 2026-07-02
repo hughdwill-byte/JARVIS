@@ -1,0 +1,27 @@
+# --- Core (required for the MVP) ---
+python-dotenv>=1.0.0      # .env loading
+anthropic>=0.40.0         # LLM + vision brain (Claude API)
+flask>=3.0.0              # local dashboard
+pypdf>=4.0.0              # PDF ingestion
+
+# --- Vision (required for camera features; MVP degrades gracefully without) ---
+opencv-python>=4.9.0      # camera capture
+pillow>=10.0.0            # image resizing before upload (cost control)
+
+# --- Audio (optional; assistant falls back to typed input/output) ---
+pyttsx3>=2.90             # offline text-to-speech
+sounddevice>=0.4.6        # microphone recording
+numpy>=1.26.0             # audio buffers
+
+# --- Speech-to-text (optional; enables push-to-talk) ---
+faster-whisper>=1.0.0     # local Whisper STT (CPU-friendly "base"/"small" models)
+
+# --- OCR (optional; needs the tesseract binary installed separately) ---
+pytesseract>=0.3.10
+
+# --- Tests ---
+pytest>=8.0.0
+
+# --- Optional future upgrades (uncomment when you want them) ---
+# openwakeword>=0.6.0     # wake word ("hey jarvis")
+# edge-tts>=6.1.0         # much nicer free TTS voices (needs internet)

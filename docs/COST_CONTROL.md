@@ -1,0 +1,54 @@
+# Cost control
+
+## Upfront hardware
+
+| Tier | New spend | What you get |
+|---|---|---|
+| A — Minimum | **$25–35** | Webcam (with its mic) + existing computer/speakers |
+| B — Recommended | **$50–70** | 1080p webcam + USB speakerphone + mount + cable |
+| C — Advanced | **$150–250** | Dedicated mini PC/Pi, better cam, pedal, LED, small screen |
+
+## Monthly API cost (the only recurring cost)
+
+One Anthropic API key. Rough per-action costs at current pricing:
+
+| Action | Model | Approx. cost |
+|---|---|---|
+| Casual chat turn | Haiku | ~$0.001–0.003 |
+| Hard question / code help | Sonnet | ~$0.01–0.03 |
+| `/desk` or `/read` (one 1024px image) | Sonnet | ~$0.01–0.02 |
+| `/doc` PDF summary (capped at ~6k tokens) | Sonnet | ~$0.03–0.06 |
+
+Realistic monthly estimates:
+
+- **Light** (few chats/day, occasional /desk): **$2–4/month**
+- **Typical student use** (daily study help, several vision calls): **$5–10/month**
+- **Heavy** (constant code help, many documents): **$15–25/month**
+
+Set a hard spending limit in the Anthropic console (Settings → Limits) — do this on day one.
+
+## How the code keeps costs down (already built in)
+
+- Cheap model by default; smart model only for images, documents, and hard-task heuristics.
+- Images downscaled to ≤1024px JPEG before upload; scene *diffs* computed locally from text.
+- Conversation context trimmed (`MEMORY_CONTEXT_TURNS=12`), replies capped (`LLM_MAX_TOKENS=1024`).
+- Document text capped at ~24k chars per call.
+- Free local paths: `/ocr` instead of `/read` for clean print; `/changes` costs $0;
+  tasks/notes/reminders never touch the API.
+
+## Knobs you can turn in `.env`
+
+- `LLM_MODEL_SMART=claude-haiku-4-5` — run everything on Haiku (cheapest, weaker vision).
+- `LLM_MAX_TOKENS=512` — shorter replies.
+- `MEMORY_CONTEXT_TURNS=6` — less history per call.
+- `VISION_MAX_IMAGE_EDGE=768` — cheaper vision calls.
+
+## Which paid things are worth it
+
+| Service | Verdict |
+|---|---|
+| Anthropic API key | **Worth it immediately** — it's the entire brain, and it's cheap at this scale. |
+| Cloud TTS (ElevenLabs etc.) | **Wait.** pyttsx3 is robotic but free; try free `edge-tts` first if the voice bothers you. |
+| Cloud STT (OpenAI Whisper API) | **Wait.** Local faster-whisper is free and fine; only consider if you move to a Pi. |
+| Search APIs | **Wait.** Add a web-search tool later if you actually miss it. |
+| New hardware beyond Tier B | **Wait** until the MVP has run for a couple of weeks. |

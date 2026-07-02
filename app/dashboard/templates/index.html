@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JARVIS — Desk Assistant</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <h1>JARVIS</h1>
+    <div id="indicators">
+      <span id="ind-camera" class="ind" title="Camera is only on during snapshot commands">CAMERA OFF</span>
+      <span id="ind-llm" class="ind">LLM …</span>
+      <button id="btn-stop" title="Stop speaking">&#9632; Stop voice</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="chat-panel">
+      <div id="chat-log"></div>
+      <form id="chat-form" autocomplete="off">
+        <input id="chat-input" type="text" placeholder="Talk to JARVIS… (try /help, /desk, /task read ch. 4)" />
+        <button type="submit">Send</button>
+      </form>
+      <div class="hint">Commands: /desk &nbsp; /snapshot &nbsp; /note &nbsp; /task &nbsp; /flashcards &nbsp; /explain &nbsp; /help</div>
+    </section>
+
+    <aside id="side-panel">
+      <h2>Tasks</h2>
+      <ul id="task-list"><li class="muted">loading…</li></ul>
+      <h2>Notes</h2>
+      <ul id="note-list"><li class="muted">loading…</li></ul>
+      <h2>Recent desk scenes</h2>
+      <ul id="scene-list"><li class="muted">loading…</li></ul>
+    </aside>
+  </main>
+
+<script>
+const log = document.getElementById('chat-log');
+const form = document.getElementById('chat-form');
+const input = document.getElementById('chat-input');
+
+function addMsg(text, who) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + who;
+  div.textContent = text;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const text = input.value.trim();
+  if (!text) return;
+  addMsg(text, 'user');
+  input.value = '';
+  addMsg('…', 'bot pending');
+  const pending = log.lastChild;
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({message: text})
+    });
+    const data = await res.json();
+    pending.textContent = data.reply || '(no reply)';
+    pending.className = 'msg bot';
+  } catch (err) {
+    pending.textContent = 'Request failed — is run_dashboard.py still running?';
+    pending.className = 'msg bot error';
+  }
+  refreshSide();
+});
+
+document.getElementById('btn-stop').addEventListener('click', () =>
+  fetch('/api/stop', {method: 'POST'}));
+
+async function refreshState() {
+  try {
+    const s = await (await fetch('/api/state')).json();
+    const cam = document.getElementById('ind-camera');
+    cam.textContent = s.camera_active ? 'CAMERA ACTIVE' : 'CAMERA OFF';
+    cam.classList.toggle('active', s.camera_active);
+    const llm = document.getElementById('ind-llm');
+    llm.textContent = s.llm_available ? 'LLM ONLINE' : 'LLM OFFLINE';
+    llm.classList.toggle('active', s.llm_available);
+    (s.reminders_due || []).forEach(m => addMsg('REMINDER: ' + m, 'bot reminder'));
+  } catch (e) { /* server restarting; try again next tick */ }
+}
+
+async function fillList(url, elId, fmt) {
+  try {
+    const items = await (await fetch(url)).json();
+    const el = document.getElementById(elId);
+    el.innerHTML = '';
+    if (!items.length) el.innerHTML = '<li class="muted">none yet</li>';
+    items.forEach(it => {
+      const li = document.createElement('li');
+      li.textContent = fmt(it);
+      el.appendChild(li);
+    });
+  } catch (e) { /* ignore */ }
+}
+
+function refreshSide() {
+  fillList('/api/tasks', 'task-list',
+    t => (t.done ? '✓ ' : '• ') + t.title + (t.due ? ' (due ' + t.due + ')' : ''));
+  fillList('/api/notes', 'note-list', n => n.content);
+  fillList('/api/scenes', 'scene-list',
+    s => s.created_at.slice(0, 16).replace('T', ' ') + ' — ' + s.summary.slice(0, 80));
+}
+
+addMsg("Online. Type /help to see what I can do.", 'bot');
+refreshState();
+refreshSide();
+setInterval(refreshState, 4000);
+setInterval(refreshSide, 15000);
+</script>
+</body>
+</html>

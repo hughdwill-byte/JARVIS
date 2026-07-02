@@ -1,0 +1,45 @@
+# Setup — Linux (Ubuntu/Debian; other distros: translate the apt line)
+
+## 1. Prerequisites
+```bash
+sudo apt update
+sudo apt install -y python3 python3-venv python3-pip git \
+    libportaudio2 portaudio19-dev espeak-ng libespeak-ng1
+# Optional, for local OCR (/ocr):
+sudo apt install -y tesseract-ocr
+# Camera access:
+sudo usermod -a -G video $USER   # then log out and back in
+```
+(`libportaudio2` = microphone, `espeak-ng` = offline TTS voice.)
+
+## 2. Get the code and install
+```bash
+git clone <your-repo-url> JARVIS
+cd JARVIS
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+## 3. API key
+```bash
+cp .env.example .env
+nano .env    # paste ANTHROPIC_API_KEY=sk-ant-... — Ctrl+O to save, Ctrl+X to exit
+```
+
+## 4. Device tests
+```bash
+ls /dev/video*                            # webcam should appear (video0, video1…)
+python run_assistant.py --check
+python -m app.audio.push_to_talk --list   # set MIC_DEVICE_INDEX in .env if needed
+python -m app.audio.push_to_talk          # record + transcribe test
+```
+Audio problems? Open `pavucontrol` (install if missing) and check the Recording tab while
+the mic test runs. More fixes: `docs/TROUBLESHOOTING.md`.
+
+## 5. Run
+```bash
+python run_assistant.py
+python run_dashboard.py    # http://127.0.0.1:8321
+```
