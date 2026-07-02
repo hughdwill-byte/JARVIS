@@ -18,6 +18,7 @@ import threading
 import time
 import webbrowser
 
+import app  # noqa: F401  (runs the Python-version check before flask imports)
 from app.config import load_config
 from app.dashboard.server import create_app
 

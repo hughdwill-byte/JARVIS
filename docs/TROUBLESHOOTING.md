@@ -49,6 +49,22 @@ Then find your symptom below.
 - Editing `.env` by hand instead? The line must be exactly `ANTHROPIC_API_KEY=sk-ant-...` —
   no quotes, no spaces — then restart the app.
 
+## `TypeError: unsupported operand type(s) for |` on startup (often with missing flask/whisper too)
+Your virtual environment was built with an old Python (3.9 or earlier) — this one error
+explains everything: the code needs 3.10+, and the dependency install aborts partway on
+old Pythons, leaving modules like flask missing. Rebuild the venv with a modern Python,
+**from the JARVIS folder**:
+```bash
+# macOS (get 3.12 first if needed: brew install python@3.12)
+deactivate 2>/dev/null; rm -rf .venv
+python3.12 -m venv .venv && source .venv/bin/activate
+python --version          # must say 3.10+
+pip install -r requirements.txt
+python run_assistant.py --check
+```
+Windows: install Python 3.12 from python.org, then `py -3.12 -m venv .venv` and the same
+steps. (Newer JARVIS versions detect this and print these instructions automatically.)
+
 ## Package install errors
 - Always inside the venv (`source .venv/bin/activate` / `.venv\Scripts\activate`).
 - Upgrade pip first: `python -m pip install --upgrade pip`.

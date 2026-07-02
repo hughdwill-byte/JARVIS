@@ -5,6 +5,7 @@
 Then open http://127.0.0.1:8321 in your browser.
 """
 
+import app  # noqa: F401  (runs the Python-version check before flask imports)
 from app.config import load_config
 from app.dashboard.server import create_app
 

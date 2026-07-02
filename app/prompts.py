@@ -1,5 +1,7 @@
 """System prompts and persona for the JARVIS desk assistant."""
 
+from __future__ import annotations
+
 SYSTEM_PROMPT = """You are JARVIS, a desk-side AI assistant living on your user's desk.
 
 PERSONALITY

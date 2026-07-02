@@ -10,12 +10,25 @@ brew install tesseract
 ```
 
 ## 2. Get the code and install
+
+> **Important:** use `python3.12` (from Homebrew), NOT plain `python3`. On many Macs
+> `python3` is the old system Python 3.9, which JARVIS can't run on — it causes
+> `TypeError: unsupported operand type(s) for |` and a half-failed dependency install.
+
 ```bash
 git clone https://github.com/hughdwill-byte/JARVIS JARVIS
 cd JARVIS
-python3 -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
+python --version                     # must say 3.12.x — if not, see the note above
 python -m pip install --upgrade pip
+pip install -r requirements.txt      # must finish with no red errors
+```
+
+Already created the venv with the wrong Python? Rebuild it:
+```bash
+deactivate 2>/dev/null; rm -rf .venv
+python3.12 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
