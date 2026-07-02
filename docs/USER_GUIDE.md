@@ -145,8 +145,11 @@ Connecting Gmail/calendar takes one config file and a one-time login:
 Everything configurable lives here — organised into cards, each option explained in plain
 English. The important ones:
 
-- **AI Brain** — your API key (shown masked once saved; paste a new one to replace it) and
-  which models to use. Defaults are the cheap sensible choice.
+- **AI Brain** — where the intelligence comes from. *Brain source*: `anthropic` (API key,
+  fastest), `claude_code` (your Claude Pro subscription — no API cost, slower), or
+  `hybrid` (chat on the API, big tasks on your subscription — recommended if you have
+  Pro; setup in [`COST_CONTROL.md`](COST_CONTROL.md#already-paying-for-claude-pro-use-it-as-the-brain)).
+  Plus your API key (shown masked once saved) and which models to use.
 - **Microphone & Speech** — pick your mic *by name*. If JARVIS hears you badly, check you
   selected the desk speakerphone, not the laptop's built-in mic.
 - **Hands-free wake word** — on/off toggle and the sensitivity slider.

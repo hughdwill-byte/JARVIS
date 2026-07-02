@@ -1,4 +1,13 @@
-"""LLM client: Claude API with cheap/smart model routing and offline fallback.
+"""LLM brains: three interchangeable backends behind one interface.
+
+  LLMClient        — the Anthropic API (needs a key; fastest; default)
+  ClaudeCodeClient — the Claude Code CLI, billed to a Claude Pro/Max
+                     subscription (no API cost; a few seconds slower per turn)
+  HybridClient     — chat on the API for snappy replies; big tasks
+                     (vision, documents) on the subscription for the lower bill
+
+Pick with LLM_PROVIDER = anthropic | claude_code | hybrid | none
+(Settings -> AI Brain -> "Brain source"). create_llm_client() is the factory.
 
 Cost strategy baked in:
 - Everyday chat goes to the FAST (cheap) model.
@@ -9,9 +18,14 @@ Cost strategy baked in:
 
 from __future__ import annotations
 
+import json
+import os
+import shutil
+import subprocess
+
 from app.config import Config
 from app.logger import get_logger
-from app.prompts import SYSTEM_PROMPT
+from app.prompts import AGENT_SYSTEM_PROMPT, SYSTEM_PROMPT
 
 log = get_logger("llm")
 
@@ -27,6 +41,16 @@ _HARD_HINTS = (
     "essay feedback", "review my draft", "explain in depth", "research plan",
 )
 _HARD_LENGTH = 600  # chars — long pasted content usually means a real task
+
+
+def _pick_model(cfg: Config, user_text: str, force_smart: bool = False) -> str:
+    """Shared routing heuristics for every backend."""
+    if force_smart:
+        return cfg.llm_model_smart
+    lowered = user_text.lower()
+    if len(user_text) > _HARD_LENGTH or any(h in lowered for h in _HARD_HINTS):
+        return cfg.llm_model_smart
+    return cfg.llm_model_fast
 
 
 class LLMClient:
@@ -52,13 +76,12 @@ class LLMClient:
         """The underlying Anthropic client (used by agent mode's tool loop)."""
         return self._client
 
+    def describe(self) -> str:
+        base = f"Claude API ({self.cfg.llm_model_fast} / {self.cfg.llm_model_smart})"
+        return base if self.available else base + " — set the API key in Settings"
+
     def pick_model(self, user_text: str, force_smart: bool = False) -> str:
-        if force_smart:
-            return self.cfg.llm_model_smart
-        lowered = user_text.lower()
-        if len(user_text) > _HARD_LENGTH or any(h in lowered for h in _HARD_HINTS):
-            return self.cfg.llm_model_smart
-        return self.cfg.llm_model_fast
+        return _pick_model(self.cfg, user_text, force_smart)
 
     def chat(
         self,
@@ -127,3 +150,187 @@ class LLMClient:
         if "overloaded" in text.lower() or "529" in text:
             return "The API is overloaded right now. Try again shortly."
         return f"The LLM request failed: {text}. Check your internet connection and API key."
+
+
+CLAUDE_CODE_MISSING = (
+    "The Claude Code backend isn't ready. Install it with: "
+    "npm install -g @anthropic-ai/claude-code — then run `claude` once and log in "
+    "with your Claude Pro account. (Or switch Brain source back to 'anthropic' in Settings.)"
+)
+
+_CC_CHAT_TIMEOUT_S = 180
+_CC_TASK_TIMEOUT_S = 600
+
+
+class ClaudeCodeClient:
+    """Brain backed by the Claude Code CLI — billed to a Claude Pro/Max subscription.
+
+    Runs `claude -p` headless per request. The ANTHROPIC_API_KEY is removed from
+    the subprocess environment on purpose: with a key present Claude Code would
+    bill the API instead of the subscription, defeating the point.
+    """
+
+    def __init__(self, cfg: Config):
+        self.cfg = cfg
+        self._cli = shutil.which("claude")
+
+    @property
+    def available(self) -> bool:
+        return self._cli is not None
+
+    @property
+    def raw(self):
+        return None  # no Anthropic SDK client; agent tool-loop uses agent_task instead
+
+    def describe(self) -> str:
+        if not self.available:
+            return "Claude Code (Pro subscription) — CLI not found; " + CLAUDE_CODE_MISSING
+        return "Claude Code (billed to your Claude Pro subscription; slower per reply)"
+
+    def pick_model(self, user_text: str, force_smart: bool = False) -> str:
+        return _pick_model(self.cfg, user_text, force_smart)
+
+    def _run(self, prompt: str, system: str, model: str,
+             allowed_tools: list[str] | None = None,
+             permission_mode: str | None = None,
+             cwd: str | None = None,
+             timeout: int = _CC_CHAT_TIMEOUT_S) -> str:
+        if not self.available:
+            return CLAUDE_CODE_MISSING
+        cmd = [self._cli, "-p", prompt, "--output-format", "json", "--model", model]
+        if system:
+            cmd += ["--system-prompt", system]
+        if allowed_tools:
+            cmd += ["--allowedTools", ",".join(allowed_tools)]
+        if permission_mode:
+            cmd += ["--permission-mode", permission_mode]
+        env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True,
+                                  timeout=timeout, cwd=cwd, env=env)
+        except subprocess.TimeoutExpired:
+            return f"Claude Code didn't answer within {timeout}s — try again or switch Brain source to 'anthropic'."
+        except OSError as exc:
+            return f"Couldn't start Claude Code: {exc}"
+        if proc.returncode != 0:
+            err = (proc.stderr or proc.stdout or "").strip()[:400]
+            if "login" in err.lower() or "authent" in err.lower() or "api key" in err.lower():
+                return ("Claude Code isn't logged in. Open a terminal, run `claude`, "
+                        "and sign in with your Claude Pro account — then try again.")
+            return f"Claude Code failed: {err or 'unknown error'}"
+        try:
+            data = json.loads(proc.stdout)
+        except json.JSONDecodeError:
+            return proc.stdout.strip() or "(Claude Code returned no output)"
+        if data.get("is_error"):
+            return f"Claude Code reported an error: {data.get('result', 'unknown')}"
+        return str(data.get("result", "")).strip() or "(no reply)"
+
+    def chat(self, user_text: str, history: list[dict] | None = None,
+             context_block: str = "", force_smart: bool = False,
+             max_tokens: int | None = None) -> str:
+        system = SYSTEM_PROMPT
+        if context_block:
+            system += "\n\n--- CURRENT CONTEXT ---\n" + context_block
+        if history:
+            lines = [f"{'User' if m['role'] == 'user' else 'JARVIS'}: {m['content']}"
+                     for m in history]
+            prompt = ("Continue this conversation as JARVIS; reply with your next "
+                      "message only.\n\n" + "\n\n".join(lines) + f"\n\nUser: {user_text}")
+        else:
+            prompt = user_text
+        return self._run(prompt, system, self.pick_model(user_text, force_smart))
+
+    def analyze_image_file(self, image_path: str, prompt: str) -> str:
+        """Vision via Claude Code's Read tool (it can view image files)."""
+        task = (f"Use the Read tool to view the image file at {image_path}, "
+                f"then answer this about it:\n{prompt}")
+        return self._run(task, SYSTEM_PROMPT, self.cfg.llm_model_smart,
+                         allowed_tools=["Read"])
+
+    def analyze_image(self, image_b64: str, media_type: str, prompt: str) -> str:
+        # The CLI takes file paths, not base64 — callers should prefer
+        # analyze_image_file (ImageAnalyzer does this automatically).
+        return ("This brain backend reads images from files; the snapshot analysis "
+                "path should have used the file directly — please report this.")
+
+    def agent_task(self, task: str, workdir: str, auto_approve: bool) -> str:
+        """/agent via Claude Code's own tools. Read-only unless auto-approve is on
+        (headless runs can't show per-action y/N prompts)."""
+        if auto_approve:
+            allowed = ["Read", "Glob", "Grep", "Bash", "Edit", "Write"]
+            mode = "acceptEdits"
+            system = AGENT_SYSTEM_PROMPT
+        else:
+            allowed = ["Read", "Glob", "Grep"]
+            mode = None
+            system = (AGENT_SYSTEM_PROMPT +
+                      "\n\nNOTE: you currently have READ-ONLY access. If the task needs "
+                      "changes, report exactly what you would do and tell the user to "
+                      "enable 'Act without asking' in Settings -> Computer & Apps "
+                      "(or switch Brain source to 'anthropic'/'hybrid' for per-action "
+                      "approval prompts).")
+        return self._run(task, system, self.cfg.llm_model_smart, allowed_tools=allowed,
+                         permission_mode=mode, cwd=workdir, timeout=_CC_TASK_TIMEOUT_S)
+
+    _explain_error = LLMClient._explain_error
+
+
+class HybridClient:
+    """Snappy chat on the API; big tasks (vision, documents) on the subscription."""
+
+    def __init__(self, cfg: Config):
+        self.cfg = cfg
+        self.api = LLMClient(cfg)
+        self.cc = ClaudeCodeClient(cfg)
+
+    @property
+    def available(self) -> bool:
+        return self.api.available or self.cc.available
+
+    @property
+    def raw(self):
+        return self.api.raw  # agent tool-loop (interactive approvals) rides the API
+
+    def describe(self) -> str:
+        parts = []
+        parts.append("API " + ("OK" if self.api.available else "missing key"))
+        parts.append("Claude Code " + ("OK" if self.cc.available else "not set up"))
+        return f"Hybrid — chat on the API, big tasks on your Pro plan ({'; '.join(parts)})"
+
+    def pick_model(self, user_text: str, force_smart: bool = False) -> str:
+        return _pick_model(self.cfg, user_text, force_smart)
+
+    def chat(self, user_text: str, history: list[dict] | None = None,
+             context_block: str = "", force_smart: bool = False,
+             max_tokens: int | None = None) -> str:
+        if force_smart and self.cc.available:  # big task -> free on the subscription
+            return self.cc.chat(user_text, history, context_block, True, max_tokens)
+        target = self.api if self.api.available else self.cc
+        return target.chat(user_text, history=history, context_block=context_block,
+                           force_smart=force_smart, max_tokens=max_tokens)
+
+    def analyze_image_file(self, image_path: str, prompt: str) -> str:
+        if self.cc.available:
+            return self.cc.analyze_image_file(image_path, prompt)
+        # runtime import avoids a module-load cycle (image_analyzer imports us)
+        from app.vision.image_analyzer import encode_image
+        b64, media = encode_image(image_path, self.cfg.vision_max_image_edge)
+        return self.api.analyze_image(b64, media, prompt)
+
+    def analyze_image(self, image_b64: str, media_type: str, prompt: str) -> str:
+        return self.api.analyze_image(image_b64, media_type, prompt)
+
+    def agent_task(self, task: str, workdir: str, auto_approve: bool) -> str:
+        return self.cc.agent_task(task, workdir, auto_approve)
+
+    _explain_error = LLMClient._explain_error
+
+
+def create_llm_client(cfg: Config):
+    """Factory: the right brain for LLM_PROVIDER."""
+    if cfg.llm_provider == "claude_code":
+        return ClaudeCodeClient(cfg)
+    if cfg.llm_provider == "hybrid":
+        return HybridClient(cfg)
+    return LLMClient(cfg)  # "anthropic", or "none" -> offline fallbacks

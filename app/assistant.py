@@ -15,7 +15,7 @@ from app.audio.speech_to_text import Transcriber
 from app.audio.text_to_speech import Speaker
 from app.audio.voice_loop import VoiceLoop
 from app.brain.agent import Agent, AgentTools
-from app.brain.llm_client import LLMClient
+from app.brain.llm_client import create_llm_client
 from app.brain.mcp_client import MCPManager
 from app.brain.router import Router
 from app.brain.tool_manager import ToolManager
@@ -58,7 +58,7 @@ class Assistant:
         cfg.ensure_dirs()
 
         self.db = Database(cfg.database_path)
-        self.llm = LLMClient(cfg)
+        self.llm = create_llm_client(cfg)
         self.speaker = Speaker(cfg)
         self.transcriber = Transcriber(cfg)
         self.ptt = PushToTalk(cfg, self.transcriber)
@@ -243,8 +243,15 @@ class Assistant:
             return ("Agent mode is turned off. Enable it in Settings -> Computer & Apps "
                     "(or AGENT_ENABLED=true in .env).")
         if not self.llm.available:
-            return ("Agent mode needs the AI brain — add your Anthropic API key in "
+            return ("Agent mode needs the AI brain — set it up in "
                     "Settings -> AI Brain first.")
+        # claude_code backend: delegate the task to Claude Code's own tools.
+        if self.llm.raw is None:
+            agent_task = getattr(self.llm, "agent_task", None)
+            if agent_task is None:
+                return "This brain backend can't run agent tasks."
+            workdir = str(AgentTools(self.cfg).allowed_dirs[0])
+            return agent_task(task, workdir, self.cfg.agent_auto_approve)
         self.mcp.ensure_started()
         agent = Agent(self.cfg, self.llm, AgentTools(self.cfg),
                       self.approval_callback, self.mcp)
@@ -263,8 +270,7 @@ class Assistant:
             return "OK " if ok else "-- "
         return "\n".join([
             "Component status:",
-            f"  [{mark(self.llm.available)}] LLM brain ({self.cfg.llm_model_fast} / {self.cfg.llm_model_smart})"
-            + ("" if self.llm.available else " — set ANTHROPIC_API_KEY in .env"),
+            f"  [{mark(self.llm.available)}] AI brain — {self.llm.describe()}",
             f"  [{mark(self.camera.available)}] Camera (index {self.cfg.camera_index})"
             + ("" if self.camera.available else " — pip install opencv-python"),
             f"  [{mark(self.ptt.available and self.transcriber.available)}] Voice input"
@@ -340,8 +346,10 @@ class Assistant:
 
         # Normal conversation is tool-capable: JARVIS uses the computer/apps by
         # itself when the request needs it, and just talks when it doesn't.
+        # (The in-chat tool loop needs the API backend; the claude_code-only
+        # backend chats plainly here and handles actions via /agent.)
         speak_text = None
-        if self.cfg.agent_enabled and self.llm.available:
+        if self.cfg.agent_enabled and self.llm.available and self.llm.raw is not None:
             agent = Agent(self.cfg, self.llm, AgentTools(self.cfg),
                           self.approval_callback, self.mcp)
             try:

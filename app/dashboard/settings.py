@@ -26,11 +26,20 @@ KEY_MASK_PREFIX = "••••"  # •••• — never written back to .env
 SETTINGS_SCHEMA: list[dict] = [
     {
         "section": "AI Brain",
-        "blurb": "The paid Claude API powers replies and desk vision. One key enables everything.",
+        "blurb": "Claude powers replies, desk vision, and tasks — via the API (a key), "
+                 "your Claude Pro subscription (Claude Code), or a mix of both.",
         "items": [
+            {"key": "LLM_PROVIDER", "label": "Brain source", "type": "select",
+             "choices": ["anthropic", "hybrid", "claude_code", "none"],
+             "help": "anthropic = API key (fastest replies, pay-as-you-go). "
+                     "claude_code = your Claude Pro/Max subscription, no API cost but "
+                     "~4-8s per reply (one-time setup: install Node.js, then "
+                     "'npm install -g @anthropic-ai/claude-code', then run 'claude' and "
+                     "log in). hybrid = best of both: chat on the API, big tasks "
+                     "(documents, vision) on your subscription. none = offline."},
             {"key": "ANTHROPIC_API_KEY", "label": "Claude API key", "type": "password",
-             "help": "Get one at console.anthropic.com → API keys. Starts with sk-ant-. "
-                     "Leave untouched to keep the saved key."},
+             "help": "Needed for 'anthropic' and 'hybrid'. Get one at console.anthropic.com "
+                     "→ API keys. Starts with sk-ant-. Leave untouched to keep the saved key."},
             {"key": "LLM_MODEL_FAST", "label": "Everyday model (cheap)", "type": "select",
              "choices": ["claude-haiku-4-5", "claude-sonnet-5"],
              "help": "Used for normal chat. Haiku is the cheap sensible default."},

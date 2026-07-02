@@ -105,6 +105,16 @@ Then find your symptom below.
 - It binds 127.0.0.1 (same machine only) by design; to reach it from your phone on your own
   LAN set `DASHBOARD_HOST=0.0.0.0` in `.env` — only on a network you trust.
 
+## Claude Code backend problems (Brain source = claude_code or hybrid)
+- "CLI not found" → install Node.js (nodejs.org), then
+  `npm install -g @anthropic-ai/claude-code`, restart your terminal and JARVIS.
+- "isn't logged in" → run `claude` in a terminal and sign in with your claude.ai
+  (Pro) account; then try again.
+- Replies stopped mid-day → you may have hit your Pro plan's usage window; it resets
+  within a few hours, or switch Brain source to `anthropic` temporarily.
+- Everything feels slow → that's the trade-off of this backend (~4–8s per reply);
+  use `hybrid` so chat stays on the fast API.
+
 ## Wake word problems
 - Doesn't hear "jarvis" → lower the sensitivity slider (Settings → Hands-free wake word)
   to ~0.4; check the right mic is selected; speak from within ~2 m.

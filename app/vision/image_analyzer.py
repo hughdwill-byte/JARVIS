@@ -42,14 +42,18 @@ class ImageAnalyzer:
 
     @property
     def available(self) -> bool:
-        return self.cfg.vision_provider == "anthropic" and self.llm.available
+        return self.cfg.vision_provider != "none" and self.llm.available
 
     def _ask(self, image_path: str | Path, prompt: str) -> str:
         if not self.available:
             return (
-                "Vision analysis needs an LLM API key (ANTHROPIC_API_KEY in .env). "
+                "Vision analysis needs the AI brain (Settings -> AI Brain). "
                 f"The snapshot was still saved at {image_path} so nothing is lost."
             )
+        # Claude Code / hybrid backends read the image file directly.
+        file_fn = getattr(self.llm, "analyze_image_file", None)
+        if file_fn is not None:
+            return file_fn(str(image_path), prompt)
         b64, media = encode_image(image_path, self.cfg.vision_max_image_edge)
         return self.llm.analyze_image(b64, media, prompt)
 

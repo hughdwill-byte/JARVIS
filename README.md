@@ -40,6 +40,9 @@ Then, **inside the app**:
 1. Click **Settings** (top-left).
 2. Paste your Claude API key (free to create at [console.anthropic.com](https://console.anthropic.com);
    typical cost $5–10/month — see [docs/COST_CONTROL.md](docs/COST_CONTROL.md)).
+   *Have a Claude Pro subscription?* You can run the brain on it instead of (or alongside)
+   the API — Settings → Brain source, explained in
+   [docs/COST_CONTROL.md](docs/COST_CONTROL.md#already-paying-for-claude-pro-use-it-as-the-brain).
 3. Pick your **microphone**, **speaker**, and **camera** from the dropdowns — real device
    names, no guessing at index numbers.
 4. Click **Save & Apply** (changes are live in about a second — no restart).

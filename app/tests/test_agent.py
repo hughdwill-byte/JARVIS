@@ -200,7 +200,7 @@ def test_agent_command_offline_and_disabled(cfg):
     bot = Assistant(cfg)
     try:
         assert "task" in bot.handle("/agent").text.lower()  # usage hint
-        assert "API key" in bot.handle("/agent do something").text
+        assert "AI Brain" in bot.handle("/agent do something").text
         bot.cfg.agent_enabled = False
         assert "turned off" in bot.handle("/agent do something").text
         assert "No apps configured" in bot.handle("/apps").text

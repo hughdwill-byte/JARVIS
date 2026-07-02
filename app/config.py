@@ -118,7 +118,8 @@ class Config:
 
     @property
     def llm_available(self) -> bool:
-        return self.llm_provider == "anthropic" and bool(self.anthropic_api_key)
+        """Whether the Anthropic API path should be initialised (key + a provider that uses it)."""
+        return self.llm_provider in ("anthropic", "hybrid") and bool(self.anthropic_api_key)
 
 
 def load_config(env_file: str | os.PathLike | None = None) -> Config:

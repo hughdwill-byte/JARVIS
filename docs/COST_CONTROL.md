@@ -47,6 +47,24 @@ Set a hard spending limit in the Anthropic console (Settings → Limits) — do 
 (The same settings exist as `LLM_MODEL_SMART`, `LLM_MAX_TOKENS`, `MEMORY_CONTEXT_TURNS`,
 and `VISION_MAX_IMAGE_EDGE` in `.env` if you prefer editing files.)
 
+## Already paying for Claude Pro? Use it as the brain
+
+If you have a Claude Pro/Max subscription, JARVIS can bill usage to it instead of (or as
+well as) the API — **Settings → AI Brain → Brain source**:
+
+| Brain source | Speed | Cost | Best for |
+|---|---|---|---|
+| `anthropic` (API key) | ~1–2 s/reply | ~$5–10/month | Snappiest voice experience (default) |
+| `claude_code` (your Pro plan) | ~4–8 s/reply | $0 extra | Cost-free, if you don't mind the pause |
+| `hybrid` | fast chat, slower big tasks | a few $/month | **Recommended combo**: chat/voice on the API, documents & vision on your Pro plan |
+
+One-time setup for `claude_code`/`hybrid`: install [Node.js](https://nodejs.org), then
+`npm install -g @anthropic-ai/claude-code`, then run `claude` in a terminal and log in
+with your claude.ai account. Notes: Pro has usage windows shared with your own claude.ai
+chatting (heavy JARVIS use eats that allowance), and on the claude_code-only backend
+in-chat computer actions run read-only unless you enable *Act without asking* (the CLI
+can't show per-action y/N prompts).
+
 ## Which paid things are worth it
 
 | Service | Verdict |
