@@ -11,7 +11,7 @@
 
 ## 2. Get the code and install
 ```powershell
-git clone <your-repo-url> JARVIS
+git clone https://github.com/hughdwill-byte/JARVIS JARVIS
 cd JARVIS
 python -m venv .venv
 .venv\Scripts\activate
