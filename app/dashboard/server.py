@@ -143,7 +143,8 @@ def create_app(cfg: Config, assistant: Assistant | None = None,
     @app.get("/api/settings")
     def get_settings():
         values = read_env_values(env_path)
-        values["ANTHROPIC_API_KEY"] = mask_secret(values.get("ANTHROPIC_API_KEY", ""))
+        for secret in settings_mod.SECRET_KEYS:
+            values[secret] = mask_secret(values.get(secret, ""))
         return jsonify({
             "schema": SETTINGS_SCHEMA,
             "values": values,

@@ -158,6 +158,11 @@ SETTINGS_SCHEMA: list[dict] = [
             {"key": "PROJECTS_DIR", "label": "Default projects folder", "type": "text",
              "help": "Folder /project loads when you don't give a path. Example: "
                      "C:\\Users\\you\\uni or /Users/you/uni"},
+            {"key": "HF_TOKEN", "label": "Hugging Face token (optional)", "type": "password",
+             "help": "Only silences the 'unauthenticated requests to the HF Hub' warning "
+                     "and speeds up the one-time speech-model download. Free: "
+                     "huggingface.co → sign up → Settings → Access Tokens → New token "
+                     "(Read). Fine to leave empty."},
             {"key": "DEBUG", "label": "Verbose logging", "type": "toggle",
              "help": "Turn on only when hunting a problem; logs go to data/logs/."},
         ],
@@ -165,6 +170,7 @@ SETTINGS_SCHEMA: list[dict] = [
 ]
 
 _ALLOWED_KEYS = {item["key"] for sec in SETTINGS_SCHEMA for item in sec["items"]}
+SECRET_KEYS = {"ANTHROPIC_API_KEY", "HF_TOKEN"}  # masked in the UI, never echoed back
 _ENV_LINE = re.compile(r"^\s*([A-Z][A-Z0-9_]*)\s*=")
 
 
@@ -193,10 +199,11 @@ def read_env_values(env_path: Path = DEFAULT_ENV_PATH) -> dict[str, str]:
 def update_env_file(updates: dict[str, str], env_path: Path = DEFAULT_ENV_PATH) -> list[str]:
     """Write settings into .env, preserving comments/layout. Returns keys written."""
     updates = {k: str(v).strip() for k, v in updates.items() if k in _ALLOWED_KEYS}
-    # Never store the mask placeholder as the real API key.
-    key = updates.get("ANTHROPIC_API_KEY", "")
-    if key.startswith(KEY_MASK_PREFIX) or key.startswith("•"):
-        updates.pop("ANTHROPIC_API_KEY")
+    # Never store a mask placeholder as a real secret.
+    for secret in SECRET_KEYS:
+        value = updates.get(secret, "")
+        if value.startswith(KEY_MASK_PREFIX) or value.startswith("•"):
+            updates.pop(secret)
     if not updates:
         return []
 
