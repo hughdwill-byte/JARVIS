@@ -186,6 +186,8 @@ SETTINGS_SCHEMA: list[dict] = [
 ]
 
 _ALLOWED_KEYS = {item["key"] for sec in SETTINGS_SCHEMA for item in sec["items"]}
+# Keys managed by dedicated UI widgets rather than plain schema fields:
+_ALLOWED_KEYS |= {"TTS_FAVOURITE_VOICES"}  # comma-separated voice ids, pinned first
 SECRET_KEYS = {"ANTHROPIC_API_KEY", "HF_TOKEN"}  # masked in the UI, never echoed back
 _ENV_LINE = re.compile(r"^\s*([A-Z][A-Z0-9_]*)\s*=")
 

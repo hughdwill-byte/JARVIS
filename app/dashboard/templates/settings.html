@@ -41,6 +41,7 @@
 
 <script>
 let schema = null, values = {}, audio = {inputs: [], outputs: []}, voices = [];
+let favVoices = [];
 const root = document.getElementById('settings-root');
 
 function toast(msg, ok = true) {
@@ -59,6 +60,46 @@ function deviceOptions(list, current, extraLabel) {
     html += `<option value="${String(d.index).replace(/"/g, '&quot;')}" ${sel}>${prefix}${d.name}${star}</option>`;
   });
   return html;
+}
+
+function voiceOptions(list, current) {
+  // favourites pinned to the top, marked with a star
+  const isFav = v => favVoices.includes(String(v.index));
+  const opt = (v, star) => {
+    const sel = String(v.index) === String(current) ? 'selected' : '';
+    return `<option value="${String(v.index).replace(/"/g, '&quot;')}" ${sel}>${star}${v.name}</option>`;
+  };
+  let html = `<option value="" ${current === '' ? 'selected' : ''}>System default</option>`;
+  list.filter(isFav).forEach(v => html += opt(v, '★ '));
+  list.filter(v => !isFav(v)).forEach(v => html += opt(v, ''));
+  return html;
+}
+
+function updateFavBtn() {
+  const sel = document.getElementById('f-TTS_VOICE');
+  const btn = document.getElementById('btn-fav-voice');
+  if (!sel || !btn) return;
+  if (!sel.value) { btn.textContent = '☆ Favourite'; btn.disabled = true; return; }
+  btn.disabled = false;
+  btn.textContent = favVoices.includes(sel.value) ? '★ Unfavourite' : '☆ Favourite';
+}
+
+async function toggleFavVoice() {
+  const sel = document.getElementById('f-TTS_VOICE');
+  if (!sel || !sel.value) return;
+  const v = sel.value;
+  favVoices = favVoices.includes(v) ? favVoices.filter(x => x !== v) : [v, ...favVoices];
+  try {
+    await fetch('/api/settings', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({TTS_FAVOURITE_VOICES: favVoices.join(',')})
+    });
+    sel.innerHTML = voiceOptions(voices, v);  // re-pin, keep selection
+    updateFavBtn();
+    toast(favVoices.includes(v) ? 'Voice added to favourites.' : 'Removed from favourites.');
+  } catch (e) {
+    toast('Could not save favourite — is the app still running?', false);
+  }
 }
 
 function fieldHtml(item) {
@@ -89,7 +130,7 @@ function fieldHtml(item) {
       let opts = '';
       if (item.source === 'mic_devices') opts = deviceOptions(audio.inputs, v);
       else if (item.source === 'speaker_devices') opts = deviceOptions(audio.outputs, v);
-      else if (item.source === 'tts_voices') opts = deviceOptions(voices, v);
+      else if (item.source === 'tts_voices') opts = voiceOptions(voices, v);
       else if (item.source === 'cameras') {
         opts = `<option value="${v}" selected>Camera ${v || 0} (current)</option>`;
       } else {
@@ -102,7 +143,10 @@ function fieldHtml(item) {
       const rescan = (item.source === 'mic_devices' || item.source === 'speaker_devices'
                       || item.source === 'tts_voices')
         ? `<button class="mini" onclick="loadSettings(true)">Rescan</button>` : '';
-      control = `<div class="select-row"><select id="${id}">${opts}</select>${scanBtn}${rescan}</div>`;
+      const favBtn = item.source === 'tts_voices'
+        ? `<button class="mini" id="btn-fav-voice" onclick="toggleFavVoice()">☆ Favourite</button>` : '';
+      const onchange = item.source === 'tts_voices' ? 'onchange="updateFavBtn()"' : '';
+      control = `<div class="select-row"><select id="${id}" ${onchange}>${opts}</select>${favBtn}${scanBtn}${rescan}</div>`;
       break;
     }
     default:
@@ -141,7 +185,9 @@ async function loadSettings(isRescan) {
     const data = await (await fetch('/api/settings')).json();
     schema = data.schema; values = data.values; audio = data.audio;
     voices = data.voices || [];
+    favVoices = (values.TTS_FAVOURITE_VOICES || '').split(',').filter(Boolean);
     render();
+    updateFavBtn();
     if (isRescan) toast('Audio devices rescanned.');
   } catch (e) {
     root.innerHTML = '<div class="card warn">Could not load settings — is the JARVIS app running?</div>';

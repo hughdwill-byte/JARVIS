@@ -92,6 +92,17 @@ def test_settings_api_masks_key(client, tmp_path):
     assert values["ANTHROPIC_API_KEY"].endswith("9999")
 
 
+def test_favourite_voices_roundtrip(client, tmp_path):
+    """Favourites persist via the settings API even though they're not a schema field."""
+    resp = client.post("/api/settings",
+                       json={"TTS_FAVOURITE_VOICES": "com.apple.voice.Jamie,com.apple.voice.Daniel"})
+    assert resp.get_json()["ok"]
+    assert "TTS_FAVOURITE_VOICES=com.apple.voice.Jamie,com.apple.voice.Daniel" in \
+        (tmp_path / ".env").read_text()
+    values = client.get("/api/settings").get_json()["values"]
+    assert values["TTS_FAVOURITE_VOICES"] == "com.apple.voice.Jamie,com.apple.voice.Daniel"
+
+
 def test_restart_endpoint(client):
     assert client.post("/api/restart").get_json()["ok"]
     # The app still answers after the swap
