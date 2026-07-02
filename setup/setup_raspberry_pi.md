@@ -15,7 +15,7 @@ Note: OpenCV comes from apt (pip builds take hours on a Pi).
 
 ## 2. Get the code and install
 ```bash
-git clone <your-repo-url> JARVIS
+git clone https://github.com/hughdwill-byte/JARVIS JARVIS
 cd JARVIS
 python3 -m venv .venv --system-site-packages   # so the venv sees apt's python3-opencv
 source .venv/bin/activate
