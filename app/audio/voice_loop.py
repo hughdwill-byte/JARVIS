@@ -43,6 +43,19 @@ START_TIMEOUT_S = 6.0        # give up if you say "jarvis" then nothing
 FOLLOW_UP_WINDOW_S = 6.0     # reply window after JARVIS speaks (no wake word needed)
 MAX_UTTERANCE_S = 15.0
 END_SILENCE_S = 1.2          # stop recording after this much quiet
+MIN_VOICED_S = 0.25          # ignore blips shorter than this (coughs, keyboard, door)
+
+# Whisper invents these from noise/near-silence. If a follow-up "reply" is just
+# one of these, treat it as no reply at all — stay silent.
+_NOISE_TRANSCRIPTS = {
+    "thank you", "thanks", "thank you very much", "thanks for watching",
+    "you", "bye", "uh", "um", "hmm", "mm", "oh", "ah", "the",
+}
+
+
+def is_noise_transcript(text: str) -> bool:
+    cleaned = re.sub(r"[^a-z ]", "", text.lower()).strip()
+    return len(cleaned) <= 1 or cleaned in _NOISE_TRANSCRIPTS
 
 # Say any of these (as a short utterance) to close the mic completely.
 SLEEP_PHRASES = ("shutdown", "shut down", "stop listening", "go to sleep", "power down")
@@ -181,6 +194,8 @@ class VoiceLoop(threading.Thread):
             if first:
                 print("  Couldn't make that out — say 'jarvis' and try again.")
             return False
+        if not first and is_noise_transcript(text):
+            return False  # background noise, not a reply — say nothing
         print(f"\nyou (voice)> {text}")
         self.assistant.record_activity("user_voice", text)
         if is_sleep_phrase(text):
@@ -203,6 +218,7 @@ class VoiceLoop(threading.Thread):
         chunks: list = []
         started = False
         silence_run = 0.0
+        voiced_s = 0.0
         chunk_s = CHUNK_SAMPLES / SAMPLE_RATE
         waited = 0.0
         while True:
@@ -213,13 +229,20 @@ class VoiceLoop(threading.Thread):
                 waited += chunk_s
                 if rms >= SPEECH_RMS:
                     started = True
+                    voiced_s = chunk_s
                     chunks.append(audio)
                 elif waited >= start_timeout:
                     return None
                 continue
             chunks.append(audio)
-            silence_run = silence_run + chunk_s if rms < SPEECH_RMS else 0.0
+            if rms >= SPEECH_RMS:
+                voiced_s += chunk_s
+                silence_run = 0.0
+            else:
+                silence_run += chunk_s
             if silence_run >= END_SILENCE_S or len(chunks) * chunk_s >= MAX_UTTERANCE_S:
+                if voiced_s < MIN_VOICED_S:
+                    return None  # a blip, not speech — don't even transcribe it
                 return np.concatenate(chunks)
 
     def _drain(self, stream) -> None:

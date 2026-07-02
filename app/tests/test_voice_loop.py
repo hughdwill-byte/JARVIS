@@ -1,8 +1,21 @@
 """Hands-free voice loop: sleep phrases, config, command wiring — no audio devices needed."""
 
 from app.assistant import Assistant
-from app.audio.voice_loop import is_sleep_phrase
+from app.audio.voice_loop import is_noise_transcript, is_sleep_phrase
 from app.config import load_config
+
+
+def test_noise_transcripts_are_ignored():
+    # classic Whisper hallucinations from background noise -> stay silent
+    assert is_noise_transcript("Thank you.")
+    assert is_noise_transcript("thanks for watching")
+    assert is_noise_transcript("you")
+    assert is_noise_transcript("Hmm")
+    assert is_noise_transcript(".")
+    # real (even terse) replies still go through
+    assert not is_noise_transcript("yes")
+    assert not is_noise_transcript("no thanks, close it")
+    assert not is_noise_transcript("what about tomorrow?")
 
 
 def test_sleep_phrases_match():
