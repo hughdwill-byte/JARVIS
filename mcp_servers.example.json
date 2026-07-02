@@ -1,0 +1,20 @@
+{
+  "_readme": "Copy this file to mcp_servers.json and keep only the apps you want. Same format as Claude Desktop's config, so any MCP server example from the internet pastes straight in. Most servers run via npx and need Node.js installed (nodejs.org). Full walkthrough incl. Gmail OAuth setup: docs/COMPUTER_AND_APPS.md",
+  "mcpServers": {
+    "gmail": {
+      "command": "npx",
+      "args": ["-y", "@gongrzhe/server-gmail-autoauth-mcp"]
+    },
+    "calendar": {
+      "command": "npx",
+      "args": ["-y", "mcp-google-calendar-plus"],
+      "env": {
+        "GOOGLE_OAUTH_CREDENTIALS": "/absolute/path/to/gcp-oauth.keys.json"
+      }
+    },
+    "extra-files": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/another/folder"]
+    }
+  }
+}

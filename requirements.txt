@@ -3,6 +3,7 @@ python-dotenv>=1.0.0      # .env loading
 anthropic>=0.40.0         # LLM + vision brain (Claude API)
 flask>=3.0.0              # local dashboard
 pypdf>=4.0.0              # PDF ingestion
+mcp>=1.1.0                # connected apps (Gmail, calendar, ...) for agent mode
 
 # --- Vision (required for camera features; MVP degrades gracefully without) ---
 opencv-python>=4.9.0      # camera capture

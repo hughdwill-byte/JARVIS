@@ -67,6 +67,7 @@ With the app open (or `python run_assistant.py` in a terminal):
 | Type `/remind 25m stretch` | A spoken reminder fires in 25 minutes |
 | Type `/desk`, move something, `/desk` again, then `/changes` | "appeared: …; gone: …" |
 | Type `/flashcards TCP three-way handshake` | Instant practice flashcards |
+| Type `/agent tidy my Downloads folder into subfolders` | It plans, asks permission for each change, then does it |
 | Type `/help` | The full command list |
 
 Anything you type or say **without** a `/` is normal conversation with the AI — it knows
@@ -85,6 +86,11 @@ study workflows and PDF/project features, is **[docs/USER_GUIDE.md](docs/USER_GU
   `/timetable`, `/cite`, `/doc` PDF summaries + follow-up Q&A.
 - **Help you build** — `/project` loads a code folder for Q&A, `/code` debugs with
   explanations, `/run` executes small Python snippets in a sandbox.
+- **Use your computer & apps (agent mode)** — `/agent tidy my Downloads folder`,
+  `/agent check my email for anything from my tutor`. Multi-step tasks using your files,
+  shell, and connected apps (Gmail, calendar, … via MCP), with approval prompts before
+  anything risky and a folder allowlist. Setup & safety model:
+  [docs/COMPUTER_AND_APPS.md](docs/COMPUTER_AND_APPS.md).
 
 **What it won't do:** write assignments/essays for submission, answer quizzes or exams, or
 help disguise AI work as yours. It's a tutor, not a ghostwriter — it declines and offers the
@@ -138,7 +144,8 @@ app/
   prompts.py            JARVIS persona + vision prompts + integrity rules
   audio/                voice_loop (wake word), push_to_talk, STT, TTS
   vision/               camera, image_analyzer, ocr, scene_memory
-  brain/                llm_client (model routing), router, tool_manager
+  brain/                llm_client (model routing), router, agent (computer use),
+                        mcp_client (connected apps), tool_manager
   memory/               database (SQLite), notes, preferences
   tools/                tasks, reminders, documents, project_files, study_tools, code_helper
   dashboard/            the app UI: chat page, settings page, device tests

@@ -113,6 +113,28 @@ SETTINGS_SCHEMA: list[dict] = [
         ],
     },
     {
+        "section": "Computer & Apps (agent mode)",
+        "blurb": "/agent lets JARVIS complete tasks using this computer (files, commands) "
+                 "and connected apps like email or calendar (set up via mcp_servers.json — "
+                 "see docs/COMPUTER_AND_APPS.md). Risky actions always ask you first unless "
+                 "you opt in below.",
+        "items": [
+            {"key": "AGENT_ENABLED", "label": "Agent mode", "type": "toggle",
+             "help": "Off = /agent is disabled entirely; JARVIS can't touch files or apps."},
+            {"key": "AGENT_ALLOWED_DIRS", "label": "Folders it may touch", "type": "text",
+             "help": "Comma-separated. ~ means your whole home folder; tighten to e.g. "
+                     "~/Downloads,~/uni if you prefer."},
+            {"key": "AGENT_AUTO_APPROVE", "label": "Act without asking", "type": "toggle",
+             "help": "Off (recommended): every file write, command, or email send asks you "
+                     "first in the terminal. On: it just acts — required for agent tasks "
+                     "started from this app window."},
+            {"key": "AGENT_MAX_STEPS", "label": "Max steps per task", "type": "number",
+             "min": 3, "max": 40,
+             "help": "How many tool actions one /agent task may take. More = bigger tasks, "
+                     "higher cost."},
+        ],
+    },
+    {
         "section": "Advanced",
         "blurb": "You rarely need to touch these.",
         "items": [

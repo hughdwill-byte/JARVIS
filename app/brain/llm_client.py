@@ -47,6 +47,11 @@ class LLMClient:
     def available(self) -> bool:
         return self._client is not None
 
+    @property
+    def raw(self):
+        """The underlying Anthropic client (used by agent mode's tool loop)."""
+        return self._client
+
     def pick_model(self, user_text: str, force_smart: bool = False) -> str:
         if force_smart:
             return self.cfg.llm_model_smart

@@ -14,7 +14,9 @@ from app.audio.push_to_talk import PushToTalk
 from app.audio.speech_to_text import Transcriber
 from app.audio.text_to_speech import Speaker
 from app.audio.voice_loop import VoiceLoop
+from app.brain.agent import Agent, AgentTools
 from app.brain.llm_client import LLMClient
+from app.brain.mcp_client import MCPManager
 from app.brain.router import Router
 from app.brain.tool_manager import ToolManager
 from app.config import Config
@@ -69,6 +71,12 @@ class Assistant:
         # Hands-free mode: created here, started by the front-end (run_assistant).
         self.voice_loop = VoiceLoop(self) if cfg.wake_word_enabled else None
 
+        # Agent mode (computer use + connected apps). MCP servers connect lazily
+        # on first /agent or /apps so boot stays fast.
+        self.mcp = MCPManager(cfg)
+        # Front-ends may replace this with an interactive y/N prompt.
+        self.approval_callback = self._default_approval
+
         self._last_snapshot: str | None = None
         self._handle_lock = threading.Lock()  # voice loop + terminal + dashboard
         # Rolling feed of voice exchanges so the dashboard can display them.
@@ -120,6 +128,9 @@ class Assistant:
         # Code
         t.register("code", "coding help / debugging", self.code.assist, speak_reply=False)
         t.register("run", "run a small Python snippet (sandboxed)", self.code.run_python, speak_reply=False)
+        # Agent mode
+        t.register("agent", "do a task using this computer + connected apps", self._cmd_agent, speak_reply=False)
+        t.register("apps", "list connected apps (email, calendar, ...)", self._cmd_apps, speak_reply=False)
         # Control
         t.register("stop", "stop speaking", self._cmd_stop)
         t.register("voice", "record one voice message (push-to-talk)", self._cmd_voice)
@@ -207,6 +218,35 @@ class Assistant:
     def _cmd_clear(self, _: str) -> str:
         self.db.clear_conversation()
         return "Conversation history cleared. Fresh start."
+
+    # --- agent mode -----------------------------------------------------------
+    def _default_approval(self, tool_name: str, description: str) -> bool:
+        """Used when no interactive prompt is attached (e.g. the web app)."""
+        return self.cfg.agent_auto_approve
+
+    def _cmd_agent(self, task: str) -> str:
+        if not task.strip():
+            return ("Give me a task, e.g.\n"
+                    "  /agent tidy my Downloads folder into subfolders by file type\n"
+                    "  /agent check my email for anything from my tutor this week\n"
+                    "  /agent find every PDF about thermodynamics on this machine")
+        if not self.cfg.agent_enabled:
+            return ("Agent mode is turned off. Enable it in Settings -> Computer & Apps "
+                    "(or AGENT_ENABLED=true in .env).")
+        if not self.llm.available:
+            return ("Agent mode needs the AI brain — add your Anthropic API key in "
+                    "Settings -> AI Brain first.")
+        self.mcp.ensure_started()
+        agent = Agent(self.cfg, self.llm, AgentTools(self.cfg),
+                      self.approval_callback, self.mcp)
+        try:
+            return agent.run(task)
+        except Exception as exc:  # never let an agent bug kill the loop
+            log.exception("Agent run crashed")
+            return f"Agent mode hit an error: {exc}"
+
+    def _cmd_apps(self, _: str) -> str:
+        return self.mcp.status_text()
 
     # --- status / reminders ----------------------------------------------
     def status_text(self) -> str:

@@ -84,6 +84,13 @@ class Config:
     dashboard_host: str = "127.0.0.1"
     dashboard_port: int = 8321
 
+    # Agent mode (computer use + connected apps)
+    agent_enabled: bool = True
+    agent_max_steps: int = 15
+    agent_auto_approve: bool = False
+    agent_allowed_dirs: str = "~"  # comma-separated folders the agent may touch
+    mcp_config_path: Path = field(default_factory=lambda: PROJECT_ROOT / "mcp_servers.json")
+
     # Misc
     debug: bool = False
     projects_dir: Path | None = None
@@ -152,6 +159,11 @@ def load_config(env_file: str | os.PathLike | None = None) -> Config:
         memory_context_turns=_int(os.getenv("MEMORY_CONTEXT_TURNS"), 12),
         dashboard_host=os.getenv("DASHBOARD_HOST", "127.0.0.1").strip(),
         dashboard_port=_int(os.getenv("DASHBOARD_PORT"), 8321),
+        agent_enabled=_bool(os.getenv("AGENT_ENABLED"), True),
+        agent_max_steps=_int(os.getenv("AGENT_MAX_STEPS"), 15),
+        agent_auto_approve=_bool(os.getenv("AGENT_AUTO_APPROVE"), False),
+        agent_allowed_dirs=os.getenv("AGENT_ALLOWED_DIRS", "~").strip() or "~",
+        mcp_config_path=Path(os.getenv("MCP_CONFIG_PATH", "").strip() or PROJECT_ROOT / "mcp_servers.json"),
         debug=_bool(os.getenv("DEBUG"), False),
         projects_dir=Path(projects_dir_raw) if projects_dir_raw else None,
     )

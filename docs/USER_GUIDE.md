@@ -113,6 +113,20 @@ Type `/help` anytime for this list inside the app.
 | `/code <question + pasted code>` | Explains the bug and *why*, then the minimal fix |
 | `/run <python>` | `/run print(sum(range(100)))` — sandboxed, 10s limit |
 
+### Using your computer and apps (agent mode)
+| Command | Example |
+|---|---|
+| `/agent <task>` | `/agent tidy my Downloads into subfolders by file type` · `/agent check my email for anything from my tutor this week` |
+| `/apps` | List connected apps (Gmail, calendar, …) and their status |
+
+Agent mode is JARVIS actually *doing* things: it reads folders and files, runs commands,
+and uses connected apps, step by step, until the task is done. Before anything risky
+(writing a file, running a command, sending an email) it shows you exactly what it wants
+to do and waits for your y/N in the terminal; every reply ends with a full "Actions taken"
+list. Which folders it may touch — and the off switch — live in **Settings → Computer &
+Apps**. Connecting Gmail/calendar takes one config file and a one-time login:
+[`COMPUTER_AND_APPS.md`](COMPUTER_AND_APPS.md).
+
 ### Control
 `/listen` mic on · `/sleep` mic off · `/stop` stop speaking · `/status` component health ·
 `/clear` reset conversation · `/help` all commands
@@ -132,6 +146,8 @@ English. The important ones:
 - **Camera & Vision** — *Scan for cameras* finds what's plugged in; *Test camera* shows you
   exactly what JARVIS sees (use this to aim the camera). Also: how many days snapshots are
   kept (0 = delete right after analysis).
+- **Computer & Apps** — the agent-mode controls: on/off, which folders it may touch,
+  whether it must ask before each risky action, and the per-task step limit.
 - **Device tests** (bottom) — after any change, hit Save & Apply, then run 🔊 🎤 📷 🧠.
   Green = working; red tells you precisely what to fix.
 

@@ -47,6 +47,15 @@ def main() -> int:
         cfg.tts_provider = "none"
     assistant = Assistant(cfg)
 
+    def terminal_approve(tool_name: str, description: str) -> bool:
+        print(f"\n  JARVIS wants to: {description}")
+        try:
+            return input("  Allow this? [y/N] ").strip().lower() in ("y", "yes")
+        except EOFError:
+            return False
+
+    assistant.approval_callback = terminal_approve
+
     if "--check" in sys.argv:
         code = first_run_check(assistant)
         assistant.close()
