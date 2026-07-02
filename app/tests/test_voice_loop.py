@@ -1,7 +1,7 @@
 """Hands-free voice loop: sleep phrases, config, command wiring — no audio devices needed."""
 
 from app.assistant import Assistant
-from app.audio.voice_loop import is_noise_transcript, is_sleep_phrase
+from app.audio.voice_loop import is_noise_transcript, is_sleep_phrase, looks_like_echo
 from app.config import load_config
 
 
@@ -31,6 +31,18 @@ def test_sleep_phrases_ignore_normal_speech():
     assert not is_sleep_phrase("what's on my desk")
     # 'shutdown' inside a longer sentence must NOT close the mic
     assert not is_sleep_phrase("how do I shutdown a linux server safely")
+
+
+def test_self_echo_is_disregarded():
+    spoken = "Your desk has a laptop, a blue notebook, and two pens on the left."
+    # mic picks up (part of) its own sentence -> discard
+    assert looks_like_echo("a blue notebook and two pens", spoken)
+    assert looks_like_echo("your desk has a laptop", spoken)
+    # genuine user follow-ups survive, even when they share a couple of words
+    assert not looks_like_echo("move the notebook to my bag list", spoken)
+    assert not looks_like_echo("yes", spoken)
+    assert not looks_like_echo("what pens?", spoken)
+    assert not looks_like_echo("anything", "")
 
 
 def test_wake_word_config(monkeypatch):

@@ -131,6 +131,16 @@ steps. (Newer JARVIS versions detect this and print these instructions automatic
 - Everything feels slow → that's the trade-off of this backend (~4–8s per reply);
   use `hybrid` so chat stays on the fast API.
 
+## JARVIS reacts to its own voice (feedback loop)
+Three layers of protection are built in: wake detection is suspended while it speaks and
+for ~0.8s after (echo tail), and follow-up transcripts that mostly match what it just said
+are discarded. If it still self-triggers:
+- Point the speaker away from the microphone; more distance between them helps a lot.
+- Use a USB speakerphone as BOTH mic and speaker — its hardware echo cancellation makes
+  the problem physically impossible.
+- Raise the wake sensitivity threshold to ~0.6 (Settings → Hands-free wake word).
+- Lower the speaking volume slightly.
+
 ## Wake word problems
 - Doesn't hear "jarvis" → lower the sensitivity slider (Settings → Hands-free wake word)
   to ~0.4; check the right mic is selected; speak from within ~2 m.

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import tempfile
 import threading
+import time
 from pathlib import Path
 
 from app.config import Config
@@ -25,6 +26,8 @@ class Speaker:
         self._thread: threading.Thread | None = None
         self._engine = None
         self._enabled = cfg.tts_provider == "pyttsx3"
+        self.last_text: str = ""       # what JARVIS last said (echo filtering)
+        self._finished_at: float = 0.0  # monotonic time speech last ended
         if self._enabled:
             try:
                 import pyttsx3  # noqa: F401  (probe the import here, init per-utterance)
@@ -40,6 +43,15 @@ class Speaker:
     @property
     def is_speaking(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
+
+    @property
+    def seconds_since_speech(self) -> float:
+        """Time since speech last ended (inf if never spoke; 0 while speaking)."""
+        if self.is_speaking:
+            return 0.0
+        if self._finished_at == 0.0:
+            return float("inf")
+        return time.monotonic() - self._finished_at
 
     def speak(self, text: str) -> None:
         """Speak asynchronously so the user can keep typing (and /stop works)."""
@@ -73,7 +85,9 @@ class Speaker:
                 self._enabled = False
             finally:
                 self._engine = None
+                self._finished_at = time.monotonic()
 
+        self.last_text = text
         self._thread = threading.Thread(target=_run, daemon=True)
         self._thread.start()
 

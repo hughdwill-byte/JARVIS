@@ -44,6 +44,7 @@ FOLLOW_UP_WINDOW_S = 6.0     # reply window after JARVIS speaks (no wake word ne
 MAX_UTTERANCE_S = 15.0
 END_SILENCE_S = 1.2          # stop recording after this much quiet
 MIN_VOICED_S = 0.25          # ignore blips shorter than this (coughs, keyboard, door)
+TTS_COOLDOWN_S = 0.8         # ignore the mic briefly after JARVIS speaks (room echo tail)
 
 # Whisper invents these from noise/near-silence. If a follow-up "reply" is just
 # one of these, treat it as no reply at all — stay silent.
@@ -56,6 +57,23 @@ _NOISE_TRANSCRIPTS = {
 def is_noise_transcript(text: str) -> bool:
     cleaned = re.sub(r"[^a-z ]", "", text.lower()).strip()
     return len(cleaned) <= 1 or cleaned in _NOISE_TRANSCRIPTS
+
+
+def looks_like_echo(transcript: str, last_spoken: str) -> bool:
+    """True if the mic mostly heard JARVIS's own words (speaker bleed/echo)."""
+    if not last_spoken or not transcript:
+        return False
+    t = re.sub(r"[^a-z ]", "", transcript.lower()).strip()
+    s = re.sub(r"[^a-z ]", "", last_spoken.lower()).strip()
+    if not t:
+        return False
+    if len(t) > 12 and t in s:
+        return True  # a contiguous chunk of what it just said
+    t_words = t.split()
+    if len(t_words) < 3:
+        return False  # too short to judge — let terse real replies through
+    overlap = len(set(t_words) & set(s.split())) / len(set(t_words))
+    return overlap >= 0.8
 
 # Say any of these (as a short utterance) to close the mic completely.
 SLEEP_PHRASES = ("shutdown", "shut down", "stop listening", "go to sleep", "power down")
@@ -157,8 +175,9 @@ class VoiceLoop(threading.Thread):
             self.detector.reset()
             while not self._stop and self._listen.is_set():
                 chunk, _overflowed = stream.read(CHUNK_SAMPLES)
-                if self.assistant.speaker.is_speaking:
-                    self.detector.reset()  # don't let TTS output trigger the wake word
+                if (self.assistant.speaker.is_speaking
+                        or self.assistant.speaker.seconds_since_speech < TTS_COOLDOWN_S):
+                    self.detector.reset()  # own voice / echo tail can't wake it
                     continue
                 if self.detector.process(chunk[:, 0]):
                     self._handle_wake(stream)
@@ -174,8 +193,9 @@ class VoiceLoop(threading.Thread):
         # the user can respond without saying the wake word again.
         while (spoke and self.cfg.follow_up_listen
                and not self._stop and self._listen.is_set()):
-            self.assistant.speaker.wait()  # let JARVIS finish talking first
-            self._drain(stream)
+            self.assistant.speaker.wait()   # let JARVIS finish talking first
+            time.sleep(TTS_COOLDOWN_S)      # let the room echo die down
+            self._drain(stream)             # discard everything heard so far
             print("  [still listening — reply now, or stay quiet to end]")
             spoke = self._one_exchange(stream, FOLLOW_UP_WINDOW_S, first=False)
         if not self._stop and self._listen.is_set():
@@ -196,6 +216,9 @@ class VoiceLoop(threading.Thread):
             return False
         if not first and is_noise_transcript(text):
             return False  # background noise, not a reply — say nothing
+        if looks_like_echo(text, self.assistant.speaker.last_text):
+            log.info("Discarded self-echo: %r", text)
+            return False  # the mic heard JARVIS's own voice — disregard it
         print(f"\nyou (voice)> {text}")
         self.assistant.record_activity("user_voice", text)
         if is_sleep_phrase(text):
