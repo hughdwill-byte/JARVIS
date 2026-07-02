@@ -37,7 +37,7 @@ def test_llm_available_includes_hybrid():
 # --- Claude Code backend --------------------------------------------------------
 
 def test_cc_unavailable_without_cli(monkeypatch):
-    monkeypatch.setattr(mod.shutil, "which", lambda name: None)
+    monkeypatch.setattr(mod, "_find_claude_cli", lambda: None)
     cc = ClaudeCodeClient(_cfg("claude_code"))
     assert not cc.available
     assert "npm install" in cc.chat("hello")
@@ -45,7 +45,7 @@ def test_cc_unavailable_without_cli(monkeypatch):
 
 
 def test_cc_chat_runs_cli_and_strips_api_key(monkeypatch):
-    monkeypatch.setattr(mod.shutil, "which", lambda name: "/usr/bin/claude")
+    monkeypatch.setattr(mod, "_find_claude_cli", lambda: "/usr/bin/claude")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-should-not-leak")
     captured = {}
 
@@ -66,7 +66,7 @@ def test_cc_chat_runs_cli_and_strips_api_key(monkeypatch):
 
 
 def test_cc_login_error_gives_instructions(monkeypatch):
-    monkeypatch.setattr(mod.shutil, "which", lambda name: "/usr/bin/claude")
+    monkeypatch.setattr(mod, "_find_claude_cli", lambda: "/usr/bin/claude")
     monkeypatch.setattr(mod.subprocess, "run", lambda cmd, **k: SimpleNamespace(
         returncode=1, stdout="", stderr="Invalid API key · Please run /login"))
     cc = ClaudeCodeClient(_cfg("claude_code"))
@@ -74,7 +74,7 @@ def test_cc_login_error_gives_instructions(monkeypatch):
 
 
 def test_cc_agent_task_readonly_unless_auto_approve(monkeypatch, tmp_path):
-    monkeypatch.setattr(mod.shutil, "which", lambda name: "/usr/bin/claude")
+    monkeypatch.setattr(mod, "_find_claude_cli", lambda: "/usr/bin/claude")
     calls = []
     monkeypatch.setattr(mod.subprocess, "run", lambda cmd, **k: (
         calls.append(cmd),

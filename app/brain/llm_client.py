@@ -153,10 +153,34 @@ class LLMClient:
 
 
 CLAUDE_CODE_MISSING = (
-    "The Claude Code backend isn't ready. Install it with: "
-    "npm install -g @anthropic-ai/claude-code — then run `claude` once and log in "
-    "with your Claude Pro account. (Or switch Brain source back to 'anthropic' in Settings.)"
+    "The Claude Code backend isn't ready. One-time setup in a terminal: "
+    "1) install Node.js (macOS: brew install node), "
+    "2) npm install -g @anthropic-ai/claude-code, "
+    "3) run `claude` once and log in with your Claude Pro account, "
+    "4) restart JARVIS. (Or switch Brain source back to 'anthropic' in Settings.)"
 )
+
+# Where the claude binary hides when it's not on PATH — common when JARVIS is
+# launched from Finder/a shortcut, which doesn't inherit your shell's PATH.
+_CLAUDE_CLI_FALLBACKS = (
+    "~/.claude/local/claude",       # native installer
+    "~/.local/bin/claude",          # native installer (newer)
+    "/opt/homebrew/bin/claude",     # npm -g on Apple Silicon Macs
+    "/usr/local/bin/claude",        # npm -g on Intel Macs / Linux
+    "~/.npm-global/bin/claude",     # custom npm prefix
+    "~/AppData/Roaming/npm/claude.cmd",  # npm -g on Windows
+)
+
+
+def _find_claude_cli() -> str | None:
+    found = shutil.which("claude")
+    if found:
+        return found
+    for candidate in _CLAUDE_CLI_FALLBACKS:
+        path = os.path.expanduser(candidate)
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            return path
+    return None
 
 _CC_CHAT_TIMEOUT_S = 180
 _CC_TASK_TIMEOUT_S = 600
@@ -172,7 +196,7 @@ class ClaudeCodeClient:
 
     def __init__(self, cfg: Config):
         self.cfg = cfg
-        self._cli = shutil.which("claude")
+        self._cli = _find_claude_cli()
 
     @property
     def available(self) -> bool:
