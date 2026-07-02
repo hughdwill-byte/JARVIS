@@ -17,6 +17,8 @@ _PHRASE_ROUTES: list[tuple[re.Pattern, str, str]] = [
     (re.compile(r"\bwhat changed (on|since)\b", re.I), "changes", ""),
     (re.compile(r"\bread (this|the) (page|document|text)\b", re.I), "read", ""),
     (re.compile(r"\bstop (talking|speaking)\b", re.I), "stop", ""),
+    (re.compile(r"^(shutdown|shut down|stop listening|go to sleep)[.!]?$", re.I), "sleep", ""),
+    (re.compile(r"^(start listening|wake up)[.!]?$", re.I), "listen", ""),
 ]
 
 

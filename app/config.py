@@ -38,6 +38,13 @@ def _opt_int(value: str | None) -> int | None:
         return None
 
 
+def _float(value: str | None, default: float) -> float:
+    try:
+        return float(value) if value not in (None, "") else default
+    except ValueError:
+        return default
+
+
 @dataclass
 class Config:
     # LLM
@@ -58,6 +65,11 @@ class Config:
     whisper_model_size: str = "base"
     mic_device_index: int | None = None
     mic_sample_rate: int = 16000
+
+    # Wake word ("hey jarvis" hands-free mode)
+    wake_word_enabled: bool = False
+    wake_word_model: str = "hey_jarvis"
+    wake_word_threshold: float = 0.5
 
     # TTS
     tts_provider: str = "pyttsx3"
@@ -127,6 +139,9 @@ def load_config(env_file: str | os.PathLike | None = None) -> Config:
         whisper_model_size=os.getenv("WHISPER_MODEL_SIZE", "base").strip(),
         mic_device_index=_opt_int(os.getenv("MIC_DEVICE_INDEX")),
         mic_sample_rate=_int(os.getenv("MIC_SAMPLE_RATE"), 16000),
+        wake_word_enabled=_bool(os.getenv("WAKE_WORD_ENABLED"), False),
+        wake_word_model=os.getenv("WAKE_WORD_MODEL", "hey_jarvis").strip(),
+        wake_word_threshold=_float(os.getenv("WAKE_WORD_THRESHOLD"), 0.5),
         tts_provider=os.getenv("TTS_PROVIDER", "pyttsx3").strip().lower(),
         tts_rate=_int(os.getenv("TTS_RATE"), 180),
         database_path=database_path,

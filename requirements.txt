@@ -16,6 +16,10 @@ numpy>=1.26.0             # audio buffers
 # --- Speech-to-text (optional; enables push-to-talk) ---
 faster-whisper>=1.0.0     # local Whisper STT (CPU-friendly "base"/"small" models)
 
+# --- Hands-free wake word ("jarvis") ---
+openwakeword>=0.6.0       # local wake-word detection
+onnxruntime>=1.16.0       # inference backend (works on macOS incl. Apple Silicon)
+
 # --- OCR (optional; needs the tesseract binary installed separately) ---
 pytesseract>=0.3.10
 
@@ -23,5 +27,4 @@ pytesseract>=0.3.10
 pytest>=8.0.0
 
 # --- Optional future upgrades (uncomment when you want them) ---
-# openwakeword>=0.6.0     # wake word ("hey jarvis")
 # edge-tts>=6.1.0         # much nicer free TTS voices (needs internet)

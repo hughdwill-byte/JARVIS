@@ -1,76 +1,93 @@
-"""Wake word support ("hey jarvis") via openWakeWord — OPTIONAL upgrade.
+"""Wake word detection ("hey jarvis") via openWakeWord.
 
-Not part of the MVP loop: push-to-talk is more reliable and doesn't keep the
-microphone open. Enable later by installing `openwakeword` and wiring
-WakeWordListener into run_assistant.py (see README "Voice upgrade").
+Uses the ONNX inference framework on every platform — the default TFLite
+runtime has no wheels for Apple Silicon Macs, ONNX works everywhere
+(macOS Intel/ARM, Windows, Linux, Raspberry Pi).
 
-Privacy note: wake-word mode keeps the mic streaming continuously so the
-detector can hear the phrase. Audio is processed locally in small chunks and
-never leaves the machine, but the [MIC ACTIVE] state is on the whole time —
-that's why it is opt-in.
+Install:  pip install openwakeword onnxruntime
+
+Privacy note: wake-word mode keeps the microphone streaming so the detector
+can hear the phrase. Every audio chunk is scored LOCALLY and discarded —
+nothing is recorded or uploaded until the wake word fires. Saying "shutdown"
+(or /sleep) closes the microphone device entirely. See app/audio/voice_loop.py
+for the state machine.
 """
 
 from __future__ import annotations
 
-from typing import Callable
-
-from app.config import Config
 from app.logger import get_logger
 
 log = get_logger("wakeword")
 
 try:
     import numpy as np
-    import sounddevice as sd
 except ImportError:
-    sd = None
     np = None
 
+CHUNK_SAMPLES = 1280  # 80ms @ 16kHz — openwakeword's expected frame size
 
-class WakeWordListener:
-    def __init__(self, cfg: Config, on_wake: Callable[[], None],
-                 model_name: str = "hey_jarvis", threshold: float = 0.6):
-        self.cfg = cfg
-        self.on_wake = on_wake
+
+def wake_word_deps_ok() -> bool:
+    if np is None:
+        return False
+    try:
+        import openwakeword  # noqa: F401
+        import onnxruntime  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+class WakeWordDetector:
+    """Feeds 80ms int16 chunks to openWakeWord; process() returns True on detection."""
+
+    def __init__(self, model_name: str = "hey_jarvis", threshold: float = 0.5):
         self.model_name = model_name
         self.threshold = threshold
-        self._stop = False
+        self._model = None
 
     @property
     def available(self) -> bool:
-        if sd is None:
-            return False
-        try:
-            import openwakeword  # noqa: F401
-            return True
-        except ImportError:
-            return False
+        return wake_word_deps_ok()
 
-    def listen_forever(self) -> None:
-        """Blocking loop: call on_wake() each time the wake word is heard."""
-        if not self.available:
-            print("Wake word needs: pip install openwakeword sounddevice numpy")
+    @staticmethod
+    def why_unavailable() -> str:
+        return ("Wake word needs: pip install openwakeword onnxruntime "
+                "(plus sounddevice numpy for the microphone)")
+
+    def load(self) -> None:
+        """Download (first run only) and load the model. Raises RuntimeError with a hint."""
+        if self._model is not None:
             return
-
-        from openwakeword.model import Model
-
-        oww = Model(wakeword_models=[self.model_name])
-        chunk = 1280  # 80ms at 16kHz, openwakeword's expected frame
-        print("  [MIC ACTIVE — wake word mode] Say 'hey jarvis'. Ctrl+C to stop.")
+        if not self.available:
+            raise RuntimeError(self.why_unavailable())
         try:
-            with sd.InputStream(samplerate=16000, channels=1, dtype="int16",
-                                blocksize=chunk, device=self.cfg.mic_device_index) as stream:
-                while not self._stop:
-                    audio, _ = stream.read(chunk)
-                    scores = oww.predict(np.frombuffer(audio, dtype=np.int16))
-                    if scores.get(self.model_name, 0) > self.threshold:
-                        log.info("Wake word detected")
-                        oww.reset()
-                        self.on_wake()
-        except KeyboardInterrupt:
-            pass
-        finally:
-            print("  [MIC OFF]")
+            import openwakeword.utils
+            from openwakeword.model import Model
 
-    def stop(self) -> None:
-        self._stop = True
+            # First run: fetch the wake model + shared feature models (~5MB total).
+            openwakeword.utils.download_models([self.model_name])
+            self._model = Model(
+                wakeword_models=[self.model_name],
+                inference_framework="onnx",
+            )
+            log.info("Wake word model '%s' loaded (onnx)", self.model_name)
+        except Exception as exc:
+            raise RuntimeError(
+                f"Could not load wake word model '{self.model_name}': {exc}. "
+                "First run needs internet to download it; also check "
+                "`pip install openwakeword onnxruntime` completed."
+            ) from exc
+
+    def process(self, chunk_int16: "np.ndarray") -> bool:
+        """Score one audio chunk; True exactly when the wake word fires."""
+        scores = self._model.predict(np.asarray(chunk_int16, dtype=np.int16).flatten())
+        if max(scores.values(), default=0.0) > self.threshold:
+            self._model.reset()
+            return True
+        return False
+
+    def reset(self) -> None:
+        """Clear internal audio buffers (call after TTS output or a handled command)."""
+        if self._model is not None:
+            self._model.reset()

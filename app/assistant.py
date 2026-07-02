@@ -6,11 +6,13 @@ Used by both the terminal loop (run_assistant.py) and the dashboard
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass
 
 from app.audio.push_to_talk import PushToTalk
 from app.audio.speech_to_text import Transcriber
 from app.audio.text_to_speech import Speaker
+from app.audio.voice_loop import VoiceLoop
 from app.brain.llm_client import LLMClient
 from app.brain.router import Router
 from app.brain.tool_manager import ToolManager
@@ -63,7 +65,11 @@ class Assistant:
         self.study = StudyTools(self.llm)
         self.code = CodeHelper(self.llm)
 
+        # Hands-free mode: created here, started by the front-end (run_assistant).
+        self.voice_loop = VoiceLoop(self) if cfg.wake_word_enabled else None
+
         self._last_snapshot: str | None = None
+        self._handle_lock = threading.Lock()  # voice loop + terminal + dashboard
         self.tools = ToolManager()
         self._register_tools()
         self.router = Router(self.tools)
@@ -112,6 +118,8 @@ class Assistant:
         # Control
         t.register("stop", "stop speaking", self._cmd_stop)
         t.register("voice", "record one voice message (push-to-talk)", self._cmd_voice)
+        t.register("listen", "start hands-free mode (say 'jarvis' to talk)", self._cmd_listen)
+        t.register("sleep", "stop hands-free mode (mic fully off)", self._cmd_sleep)
         t.register("clear", "clear conversation history", self._cmd_clear)
         t.register("status", "show device/API status", lambda _: self.status_text(), speak_reply=False)
 
@@ -166,12 +174,30 @@ class Assistant:
         self.speaker.stop()
         return "Stopped."
 
+    def _cmd_listen(self, _: str) -> str:
+        if self.voice_loop is None:
+            return ("Hands-free mode is disabled. Set WAKE_WORD_ENABLED=true in .env "
+                    "and restart me.")
+        if not self.voice_loop.available:
+            return self.voice_loop.why_unavailable()
+        if self.voice_loop.listening:
+            return "Already listening — say 'jarvis' to talk to me."
+        self.voice_loop.wake_up()
+        return "Hands-free mode on. Say 'jarvis' to talk; say 'shutdown' to stop."
+
+    def _cmd_sleep(self, _: str) -> str:
+        if self.voice_loop is None or not self.voice_loop.listening:
+            return "Hands-free mode is already off."
+        self.voice_loop.go_to_sleep()
+        return "Microphone off. Type anything (or /listen) to re-enable hands-free mode."
+
     def _cmd_voice(self, _: str) -> str:
         transcript = self.ptt.record_once()
         if not transcript:
             return "I didn't catch anything."
         print(f"  You said: {transcript}")
-        return self.handle(transcript).text
+        # Already inside the handle lock (tool handlers run under it), so go inner.
+        return self._handle_inner(transcript).text
 
     def _cmd_clear(self, _: str) -> str:
         self.db.clear_conversation()
@@ -191,6 +217,12 @@ class Assistant:
             + ("" if (self.ptt.available and self.transcriber.available) else f" — {self.ptt.why_unavailable()}"),
             f"  [{mark(self.speaker.available)}] Voice output (TTS)"
             + ("" if self.speaker.available else " — pip install pyttsx3"),
+            f"  [{mark(self.voice_loop is not None and self.voice_loop.listening)}] "
+            "Hands-free wake word"
+            + (" — LISTENING for 'jarvis'" if self.voice_loop and self.voice_loop.listening
+               else (" — off (use /listen)" if self.voice_loop and self.voice_loop.available
+                     else " — " + (self.voice_loop.why_unavailable() if self.voice_loop
+                                   else "set WAKE_WORD_ENABLED=true in .env"))),
             f"  Database: {self.cfg.database_path}",
             f"  Snapshot retention: {self.cfg.snapshot_retention_days} day(s)",
         ])
@@ -204,6 +236,10 @@ class Assistant:
         user_text = user_text.strip()
         if not user_text:
             return Reply("", speak=False)
+        with self._handle_lock:  # voice thread and terminal/dashboard can't overlap
+            return self._handle_inner(user_text)
+
+    def _handle_inner(self, user_text: str) -> Reply:
 
         command, args = self.router.route(user_text)
 
@@ -239,5 +275,7 @@ class Assistant:
         return Reply(reply_text)
 
     def close(self) -> None:
+        if self.voice_loop is not None:
+            self.voice_loop.shutdown_thread()
         self.speaker.stop()
         self.db.close()

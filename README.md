@@ -15,8 +15,10 @@ physical side: buy hardware, plug things in, run the commands below, and paste i
   Claude-powered brain that knows your notes, tasks, and latest desk snapshot.
 - **Vision**: `/desk` photographs your desk and describes it; `/look where is my calculator?`;
   `/read` reads a page you hold up; `/changes` tells you what changed since last time.
-- **Voice**: offline speech-to-text (faster-whisper) + offline text-to-speech (pyttsx3),
-  with `/stop` to cut speech off. Wake word is an optional later upgrade.
+- **Voice**: hands-free mode — say **"jarvis"** to talk (local wake-word detection, works
+  on macOS/Windows/Linux/Pi), say **"shutdown"** to close the mic completely, type anything
+  (or `/listen`) to re-arm it. Plus push-to-talk (`/voice`), offline speech-to-text
+  (faster-whisper), offline text-to-speech (pyttsx3), and `/stop` to cut speech off.
 - **Memory**: notes, tasks, reminders, and long-term preferences — stored **only** when you
   ask, listed with `/memories`, deleted with `/forget`. Everything lives in one local SQLite file.
 - **Uni tools**: `/plan` (assignment planner), `/flashcards`, `/explain`, `/timetable`,
@@ -61,6 +63,8 @@ Run `python run_assistant.py`, then:
 | 7 | `/remind 1m stand up` and wait a minute | A spoken reminder fires |
 | 8 | (move something on the desk) `/desk` then `/changes` | "appeared: … / gone: …" |
 | 9 | `/voice`, speak, press Enter | Your words transcribed and answered |
+| 10 | Say **"jarvis"**, wait for the beep, ask something | Hands-free answer, no typing |
+| 11 | Say **"jarvis"**, then **"shutdown"** | `[MIC OFF]` — mic fully released; type anything to re-arm |
 
 ## Commands
 
@@ -73,7 +77,7 @@ Type `/help` for the live list. Highlights:
 /doc /docq /project /projq                             documents & code projects
 /plan /flashcards /explain /timetable /cite            uni tools
 /code /run                                             coding help + sandboxed runner
-/voice /stop /status /clear                            voice & control
+/listen /sleep /voice /stop /status /clear             voice & control
 ```
 
 Anything without a `/` goes straight to the AI brain. Natural phrases like
@@ -145,9 +149,12 @@ ingestion, and study tools. They run with no camera, no mic, and no API key — 
 
 ## Privacy model
 
-- Camera/mic are **command-triggered only**; visible active-state indicators everywhere.
-- Wake-word mode (optional, off by default) is the only always-listening feature, processes
-  audio locally, and is clearly labelled.
+- Camera is **command-triggered only**; visible active-state indicators everywhere.
+- Hands-free mode streams the mic **only to score the wake word locally** — chunks are
+  discarded immediately, nothing is stored or uploaded until you say "jarvis". Saying
+  "shutdown" (or `/sleep`) **closes the microphone device entirely** (`[MIC OFF]`);
+  the `[MIC ACTIVE]` banner shows whenever it's open. Set `WAKE_WORD_ENABLED=false`
+  for strict push-to-talk-only operation.
 - Snapshots auto-delete after `SNAPSHOT_RETENTION_DAYS` (set `0` to keep none); long-term
   scene memory stores text descriptions, never images.
 - Long-term memory is opt-in per item and fully listable/deletable by you.
@@ -159,8 +166,8 @@ ingestion, and study tools. They run with no camera, no mic, and no API key — 
 
 Already scaffolded in the codebase, in recommended order:
 
-1. **Voice polish** — wake word (`app/audio/wake_word.py` + `pip install openwakeword`),
-   nicer TTS voices (edge-tts), device selection (`python -m app.audio.push_to_talk --list`).
+1. **Voice polish** — nicer TTS voices (edge-tts), audio device selection
+   (`python -m app.audio.push_to_talk --list`). Wake word is already built in.
 2. **Vision polish** — local OCR (`/ocr`, install tesseract), tighter retention settings.
 3. **Bigger brain features** — calendar integration, web search tool, GitHub awareness.
 

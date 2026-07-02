@@ -31,6 +31,10 @@ class Speaker:
     def available(self) -> bool:
         return self._enabled
 
+    @property
+    def is_speaking(self) -> bool:
+        return self._thread is not None and self._thread.is_alive()
+
     def speak(self, text: str) -> None:
         """Speak asynchronously so the user can keep typing (and /stop works)."""
         if not self._enabled or not text.strip():

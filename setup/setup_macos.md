@@ -44,3 +44,25 @@ Built-in FaceTime camera is usually index 0; your desk USB webcam becomes `CAMER
 python run_assistant.py
 python run_dashboard.py    # http://127.0.0.1:8321
 ```
+
+## 7. Hands-free "jarvis" mode on macOS
+
+Works on both Intel and Apple Silicon — the wake-word detector uses the ONNX runtime
+(installed by `requirements.txt`; the default TFLite backend has no Apple Silicon wheels,
+which is why this project pins ONNX).
+
+1. Make sure `WAKE_WORD_ENABLED=true` in `.env` (it is, in the template).
+2. Start the assistant: `python run_assistant.py`. First run downloads the small
+   (~5MB) wake model — needs internet once.
+3. You'll see `[MIC ACTIVE — waiting for 'jarvis'...]`. Say **"jarvis"** (or "hey jarvis"),
+   wait for the beep, then speak.
+4. Say **"shutdown"** to close the microphone completely (`[MIC OFF]`), or type `/sleep`.
+5. Type anything in the terminal (or `/listen`) to turn hands-free mode back on.
+
+Gotchas:
+- macOS mic permission must be granted to your Terminal app (step 4 above) — hands-free
+  mode reads silence forever without it.
+- If it false-triggers on music/videos, raise `WAKE_WORD_THRESHOLD=0.6` in `.env`;
+  if it misses you, lower it to `0.4`.
+- External USB speakerphone: run `python -m app.audio.push_to_talk --list` and set
+  `MIC_DEVICE_INDEX` so it doesn't listen through the built-in laptop mic.

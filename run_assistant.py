@@ -56,8 +56,16 @@ def main() -> int:
     if not assistant.llm.available:
         print("NOTE: no API key found — running in offline mode (notes/tasks/snapshots"
               " work; smart replies don't). Add ANTHROPIC_API_KEY to .env to fix.\n")
-    if assistant.ptt.available and assistant.transcriber.available:
-        print("Voice ready: type /voice to speak instead of typing.\n")
+    if assistant.voice_loop is not None:
+        if assistant.voice_loop.available:
+            assistant.voice_loop.ensure_started()
+            print("Hands-free mode: say 'jarvis' to talk, 'shutdown' to close the mic,"
+                  " type anything to re-arm it.\n")
+        else:
+            print(f"Hands-free mode unavailable: {assistant.voice_loop.why_unavailable()}\n")
+    elif assistant.ptt.available and assistant.transcriber.available:
+        print("Voice ready: type /voice to speak, or set WAKE_WORD_ENABLED=true in .env"
+              " for hands-free 'jarvis' mode.\n")
 
     try:
         while True:
@@ -72,6 +80,12 @@ def main() -> int:
                 break
             if not user_text:
                 continue
+            # Typing anything (except a sleep command) re-arms hands-free listening.
+            if (assistant.voice_loop is not None and assistant.voice_loop.available
+                    and not assistant.voice_loop.listening
+                    and assistant.router.route(user_text)[0] != "sleep"):
+                assistant.voice_loop.wake_up()
+                print("  [hands-free re-armed — say 'jarvis' anytime]")
             reply = assistant.handle(user_text)
             if reply.text:
                 print(f"\njarvis> {reply.text}\n")
