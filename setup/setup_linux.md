@@ -14,7 +14,7 @@ sudo usermod -a -G video $USER   # then log out and back in
 
 ## 2. Get the code and install
 ```bash
-git clone <your-repo-url> JARVIS
+git clone https://github.com/hughdwill-byte/JARVIS JARVIS
 cd JARVIS
 python3 -m venv .venv
 source .venv/bin/activate
