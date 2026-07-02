@@ -10,8 +10,9 @@ pillow>=10.0.0            # image resizing before upload (cost control)
 
 # --- Audio (optional; assistant falls back to typed input/output) ---
 pyttsx3>=2.90             # offline text-to-speech
-sounddevice>=0.4.6        # microphone recording
+sounddevice>=0.4.6        # microphone recording + routed speaker playback
 numpy>=1.26.0             # audio buffers
+soundfile>=0.12.0         # decode TTS audio for specific-speaker routing
 
 # --- Speech-to-text (optional; enables push-to-talk) ---
 faster-whisper>=1.0.0     # local Whisper STT (CPU-friendly "base"/"small" models)
@@ -22,6 +23,9 @@ onnxruntime>=1.16.0       # inference backend (works on macOS incl. Apple Silico
 
 # --- OCR (optional; needs the tesseract binary installed separately) ---
 pytesseract>=0.3.10
+
+# --- Desktop app window (optional; falls back to the browser) ---
+pywebview>=5.0            # native window for run_app.py (macOS WebKit / Windows WebView2)
 
 # --- Tests ---
 pytest>=8.0.0

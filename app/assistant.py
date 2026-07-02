@@ -7,6 +7,7 @@ Used by both the terminal loop (run_assistant.py) and the dashboard
 from __future__ import annotations
 
 import threading
+from collections import deque
 from dataclasses import dataclass
 
 from app.audio.push_to_talk import PushToTalk
@@ -70,6 +71,10 @@ class Assistant:
 
         self._last_snapshot: str | None = None
         self._handle_lock = threading.Lock()  # voice loop + terminal + dashboard
+        # Rolling feed of voice exchanges so the dashboard can display them.
+        self._activity: deque = deque(maxlen=100)
+        self._activity_seq = 0
+        self._activity_lock = threading.Lock()
         self.tools = ToolManager()
         self._register_tools()
         self.router = Router(self.tools)
@@ -229,6 +234,16 @@ class Assistant:
 
     def due_reminder_messages(self) -> list[str]:
         return self.reminders.pop_due()
+
+    # --- activity feed (voice exchanges shown in the dashboard) -------------
+    def record_activity(self, role: str, text: str) -> None:
+        with self._activity_lock:
+            self._activity_seq += 1
+            self._activity.append({"seq": self._activity_seq, "role": role, "text": text})
+
+    def activity_since(self, seq: int) -> list[dict]:
+        with self._activity_lock:
+            return [a for a in self._activity if a["seq"] > seq]
 
     # --- main entry point --------------------------------------------------
     def handle(self, user_text: str) -> Reply:

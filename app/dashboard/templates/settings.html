@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JARVIS — Settings</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <h1>JARVIS</h1>
+      <nav>
+        <a href="/">Chat</a>
+        <a href="/settings" class="active">Settings</a>
+      </nav>
+    </div>
+    <div id="indicators">
+      <button id="btn-apply" class="primary">Save &amp; Apply</button>
+    </div>
+  </header>
+
+  <main class="settings-main">
+    <div id="settings-root"><p class="muted" style="padding:20px">Loading settings…</p></div>
+
+    <section class="card" id="test-card">
+      <h2>Device tests</h2>
+      <p class="blurb">Save &amp; Apply first, then test. Each test tells you exactly what's wrong if it fails.</p>
+      <div class="test-row">
+        <button data-test="speaker">🔊 Test speaker</button>
+        <button data-test="mic">🎤 Test microphone (4s)</button>
+        <button data-test="camera">📷 Test camera</button>
+        <button data-test="llm">🧠 Test API key</button>
+      </div>
+      <div id="test-result" class="muted"></div>
+      <img id="test-image" alt="" style="display:none">
+    </section>
+  </main>
+
+  <div id="toast"></div>
+
+<script>
+let schema = null, values = {}, audio = {inputs: [], outputs: []};
+const root = document.getElementById('settings-root');
+
+function toast(msg, ok = true) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = ok ? 'show' : 'show err';
+  setTimeout(() => t.className = '', 4000);
+}
+
+function deviceOptions(list, current, extraLabel) {
+  let html = `<option value="" ${current === '' ? 'selected' : ''}>System default${extraLabel || ''}</option>`;
+  list.forEach(d => {
+    const sel = String(d.index) === String(current) ? 'selected' : '';
+    const star = d.default ? ' ★' : '';
+    html += `<option value="${d.index}" ${sel}>[${d.index}] ${d.name}${star}</option>`;
+  });
+  return html;
+}
+
+function fieldHtml(item) {
+  const v = values[item.key] ?? '';
+  const id = `f-${item.key}`;
+  let control = '';
+  switch (item.type) {
+    case 'toggle': {
+      const on = String(v).toLowerCase() === 'true';
+      control = `<label class="switch"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}>
+                 <span class="track"></span></label>`;
+      break;
+    }
+    case 'slider':
+      control = `<div class="slider-wrap">
+        <input type="range" id="${id}" min="${item.min}" max="${item.max}" step="${item.step}"
+               value="${v || item.min}" oninput="document.getElementById('${id}-val').textContent=this.value">
+        <span class="slider-val" id="${id}-val">${v || item.min}</span></div>`;
+      break;
+    case 'number':
+      control = `<input type="number" id="${id}" min="${item.min ?? ''}" max="${item.max ?? ''}" value="${v}">`;
+      break;
+    case 'password':
+      control = `<input type="password" id="${id}" value="${v}" placeholder="paste key here"
+                 autocomplete="off" onfocus="if(this.value.startsWith('•'))this.select()">`;
+      break;
+    case 'select': {
+      let opts = '';
+      if (item.source === 'mic_devices') opts = deviceOptions(audio.inputs, v);
+      else if (item.source === 'speaker_devices') opts = deviceOptions(audio.outputs, v);
+      else if (item.source === 'cameras') {
+        opts = `<option value="${v}" selected>Camera ${v || 0} (current)</option>`;
+      } else {
+        const choices = [...item.choices];
+        if (v && !choices.includes(String(v))) choices.unshift(String(v));
+        opts = choices.map(c => `<option value="${c}" ${String(v) === c ? 'selected' : ''}>${c}</option>`).join('');
+      }
+      const scanBtn = item.source === 'cameras'
+        ? `<button class="mini" onclick="scanCameras()">Scan for cameras</button>` : '';
+      const rescan = (item.source === 'mic_devices' || item.source === 'speaker_devices')
+        ? `<button class="mini" onclick="loadSettings(true)">Rescan devices</button>` : '';
+      control = `<div class="select-row"><select id="${id}">${opts}</select>${scanBtn}${rescan}</div>`;
+      break;
+    }
+    default:
+      control = `<input type="text" id="${id}" value="${v}">`;
+  }
+  return `<div class="field">
+    <div class="field-label"><label for="${id}">${item.label}</label></div>
+    ${control}
+    <div class="help">${item.help || ''}</div>
+  </div>`;
+}
+
+function render() {
+  let html = '';
+  if (audio.error) html += `<div class="card warn">${audio.error}</div>`;
+  schema.forEach(sec => {
+    html += `<section class="card"><h2>${sec.section}</h2>
+             <p class="blurb">${sec.blurb || ''}</p>
+             ${sec.items.map(fieldHtml).join('')}</section>`;
+  });
+  root.innerHTML = html;
+}
+
+function collect() {
+  const out = {};
+  schema.forEach(sec => sec.items.forEach(item => {
+    const el = document.getElementById(`f-${item.key}`);
+    if (!el) return;
+    out[item.key] = item.type === 'toggle' ? (el.checked ? 'true' : 'false') : el.value;
+  }));
+  return out;
+}
+
+async function loadSettings(isRescan) {
+  try {
+    const data = await (await fetch('/api/settings')).json();
+    schema = data.schema; values = data.values; audio = data.audio;
+    render();
+    if (isRescan) toast('Audio devices rescanned.');
+  } catch (e) {
+    root.innerHTML = '<div class="card warn">Could not load settings — is the JARVIS app running?</div>';
+  }
+}
+
+async function scanCameras() {
+  toast('Scanning cameras (a few seconds)…');
+  const data = await (await fetch('/api/settings/cameras')).json();
+  const sel = document.getElementById('f-CAMERA_INDEX');
+  if (data.error && !data.cameras.length) { toast(data.error, false); return; }
+  const current = sel.value;
+  sel.innerHTML = data.cameras.map(c =>
+    `<option value="${c.index}" ${String(c.index) === current ? 'selected' : ''}>${c.label}</option>`).join('');
+  toast(`Found ${data.cameras.length} camera(s).`);
+}
+
+document.getElementById('btn-apply').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-apply');
+  btn.disabled = true; btn.textContent = 'Applying…';
+  try {
+    const save = await (await fetch('/api/settings', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(collect())
+    })).json();
+    if (!save.ok) { toast(save.message, false); return; }
+    const rs = await (await fetch('/api/restart', {method: 'POST'})).json();
+    toast(rs.ok ? 'Saved — settings are now live.' : rs.message, rs.ok);
+    await loadSettings(false);
+  } catch (e) {
+    toast('Apply failed — check the app is still running.', false);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save & Apply';
+  }
+});
+
+document.querySelectorAll('#test-card [data-test]').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const kind = btn.dataset.test;
+    const result = document.getElementById('test-result');
+    const img = document.getElementById('test-image');
+    img.style.display = 'none';
+    result.textContent = kind === 'mic' ? 'Recording 4 seconds — speak now…' : 'Testing…';
+    result.className = 'muted';
+    try {
+      const data = await (await fetch('/api/test/' + kind, {method: 'POST'})).json();
+      result.textContent = data.message;
+      result.className = data.ok ? 'ok-text' : 'err-text';
+      if (data.image) { img.src = data.image; img.style.display = 'block'; }
+    } catch (e) {
+      result.textContent = 'Test failed to run — is the app still open?';
+      result.className = 'err-text';
+    }
+  });
+});
+
+loadSettings(false);
+</script>
+</body>
+</html>

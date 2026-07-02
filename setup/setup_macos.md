@@ -41,9 +41,20 @@ Built-in FaceTime camera is usually index 0; your desk USB webcam becomes `CAMER
 
 ## 6. Run
 ```bash
-python run_assistant.py
-python run_dashboard.py    # http://127.0.0.1:8321
+python run_app.py          # ← desktop app: chat + settings in a native window
+python run_assistant.py    # terminal version
+python run_dashboard.py    # browser version, http://127.0.0.1:8321
 ```
+
+Make it double-clickable (one time):
+```bash
+chmod +x launchers/JARVIS.command
+```
+Then double-click `launchers/JARVIS.command` in Finder to start JARVIS like an app
+(you can drag it to the Dock). In the app, open **Settings** to pick your microphone,
+speaker and camera by name, paste the API key, and press **Save & Apply** — no file
+editing needed. Note: the mic/camera permission prompts are granted to the app that
+launched JARVIS (Terminal or Finder), so approve them the first time each way you start it.
 
 ## 7. Hands-free "jarvis" mode on macOS
 

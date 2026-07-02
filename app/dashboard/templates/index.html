@@ -8,9 +8,16 @@
 </head>
 <body>
   <header>
-    <h1>JARVIS</h1>
+    <div class="brand">
+      <h1>JARVIS</h1>
+      <nav>
+        <a href="/" class="active">Chat</a>
+        <a href="/settings">Settings</a>
+      </nav>
+    </div>
     <div id="indicators">
-      <span id="ind-camera" class="ind" title="Camera is only on during snapshot commands">CAMERA OFF</span>
+      <button id="ind-mic" class="ind clickable" title="Click to toggle hands-free listening">MIC …</button>
+      <span id="ind-camera" class="ind" title="Camera only turns on for snapshot commands">CAMERA OFF</span>
       <span id="ind-llm" class="ind">LLM …</span>
       <button id="btn-stop" title="Stop speaking">&#9632; Stop voice</button>
     </div>
@@ -23,7 +30,8 @@
         <input id="chat-input" type="text" placeholder="Talk to JARVIS… (try /help, /desk, /task read ch. 4)" />
         <button type="submit">Send</button>
       </form>
-      <div class="hint">Commands: /desk &nbsp; /snapshot &nbsp; /note &nbsp; /task &nbsp; /flashcards &nbsp; /explain &nbsp; /help</div>
+      <div class="hint">Say <b>"jarvis"</b> to talk hands-free · say <b>"shutdown"</b> to close the mic ·
+        commands: /desk /snapshot /note /task /flashcards /explain /help</div>
     </section>
 
     <aside id="side-panel">
@@ -40,6 +48,8 @@
 const log = document.getElementById('chat-log');
 const form = document.getElementById('chat-form');
 const input = document.getElementById('chat-input');
+let micOn = false;
+let activitySeq = 0;
 
 function addMsg(text, who) {
   const div = document.createElement('div');
@@ -67,7 +77,7 @@ form.addEventListener('submit', async (e) => {
     pending.textContent = data.reply || '(no reply)';
     pending.className = 'msg bot';
   } catch (err) {
-    pending.textContent = 'Request failed — is run_dashboard.py still running?';
+    pending.textContent = 'Request failed — is the JARVIS app still running?';
     pending.className = 'msg bot error';
   }
   refreshSide();
@@ -76,17 +86,43 @@ form.addEventListener('submit', async (e) => {
 document.getElementById('btn-stop').addEventListener('click', () =>
   fetch('/api/stop', {method: 'POST'}));
 
+document.getElementById('ind-mic').addEventListener('click', async () => {
+  const res = await fetch('/api/mic', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({on: !micOn})
+  });
+  const data = await res.json();
+  if (!data.ok) addMsg(data.message, 'bot reminder');
+  refreshState();
+});
+
 async function refreshState() {
   try {
     const s = await (await fetch('/api/state')).json();
+    micOn = s.mic_listening;
+    const mic = document.getElementById('ind-mic');
+    mic.textContent = micOn ? "MIC LISTENING — say 'jarvis'" : 'MIC OFF';
+    mic.classList.toggle('listening', micOn);
     const cam = document.getElementById('ind-camera');
     cam.textContent = s.camera_active ? 'CAMERA ACTIVE' : 'CAMERA OFF';
     cam.classList.toggle('active', s.camera_active);
     const llm = document.getElementById('ind-llm');
     llm.textContent = s.llm_available ? 'LLM ONLINE' : 'LLM OFFLINE';
-    llm.classList.toggle('active', s.llm_available);
+    llm.classList.toggle('ok', s.llm_available);
     (s.reminders_due || []).forEach(m => addMsg('REMINDER: ' + m, 'bot reminder'));
-  } catch (e) { /* server restarting; try again next tick */ }
+  } catch (e) { /* server restarting; retry next tick */ }
+}
+
+async function pollActivity() {
+  try {
+    const data = await (await fetch('/api/activity?since=' + activitySeq)).json();
+    activitySeq = data.latest;
+    data.items.forEach(a => {
+      if (a.role === 'user_voice') addMsg('\u{1F3A4} ' + a.text, 'user voice');
+      else addMsg(a.text, 'bot');
+    });
+  } catch (e) { /* ignore */ }
 }
 
 async function fillList(url, elId, fmt) {
@@ -111,10 +147,11 @@ function refreshSide() {
     s => s.created_at.slice(0, 16).replace('T', ' ') + ' — ' + s.summary.slice(0, 80));
 }
 
-addMsg("Online. Type /help to see what I can do.", 'bot');
+addMsg("Online. Type /help, or say 'jarvis' if hands-free mode is on.", 'bot');
 refreshState();
 refreshSide();
 setInterval(refreshState, 4000);
+setInterval(pollActivity, 2500);
 setInterval(refreshSide, 15000);
 </script>
 </body>

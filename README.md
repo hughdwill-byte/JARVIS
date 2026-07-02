@@ -40,9 +40,18 @@ source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt  # audio/vision extras are optional — see setup/ guides
 cp .env.example .env             # then paste your ANTHROPIC_API_KEY into .env
 python run_assistant.py --check  # first-run self test with per-component fix hints
-python run_assistant.py          # terminal assistant
-python run_dashboard.py          # web UI at http://127.0.0.1:8321
+python run_app.py                # ← the desktop app (chat + settings in one window)
+python run_assistant.py          # terminal assistant (same brain)
+python run_dashboard.py          # browser version of the app
 ```
+
+**Desktop app:** `run_app.py` opens JARVIS in its own native window on macOS and Windows.
+Double-clickable launchers are in [`launchers/`](launchers/) — `JARVIS.command` (Mac,
+`chmod +x` it once) and `JARVIS.bat` (Windows, right-click → Send to → Desktop for a
+shortcut). The app's **Settings page** lets you change everything without touching a file:
+pick your microphone/speaker/camera by name, paste the API key, tune the wake word, then
+hit *Save & Apply* — changes go live instantly, and each device has a Test button that
+tells you exactly what's wrong if it fails.
 
 No API key? Everything local still works (notes, tasks, snapshots, OCR, reminders) and the
 assistant tells you exactly what to add to enable the brain. Detailed per-OS instructions,
@@ -119,8 +128,10 @@ Your physical to-do list: [`docs/BUILD_CHECKLIST.md`](docs/BUILD_CHECKLIST.md).
 ## Repository layout
 
 ```
+run_app.py              desktop app (native window: chat + settings)
 run_assistant.py        terminal front-end (+ --check self test)
 run_dashboard.py        web dashboard front-end
+launchers/              double-clickable starters for Mac (.command) and Windows (.bat)
 app/
   assistant.py          core: wires everything, registers all /commands
   config.py             .env loader with safe defaults
@@ -131,7 +142,7 @@ app/
   brain/                llm_client (model routing), router, tool_manager
   memory/               database (SQLite), notes, preferences
   tools/                tasks, reminders, documents, project_files, study_tools, code_helper
-  dashboard/            Flask server + single-page UI
+  dashboard/            Flask server + chat page + settings app (schema-driven)
   tests/                pytest suite (runs with zero devices and zero keys)
 setup/                  per-OS install guides (Windows/macOS/Linux/Raspberry Pi)
 docs/                   hardware BOM, architecture, cost control, troubleshooting, checklist

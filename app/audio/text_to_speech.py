@@ -1,11 +1,17 @@
 """Text-to-speech: offline pyttsx3 by default, with a stoppable speaker thread.
 
-Fallback chain: pyttsx3 missing/broken -> text-only mode (never crashes).
+Speaker selection: if SPEAKER_DEVICE_INDEX is set, speech is rendered to a
+temp audio file and played through that specific output device (via
+sounddevice+soundfile). Otherwise pyttsx3 speaks through the system default.
+
+Fallback chain: routed playback fails -> direct pyttsx3 -> text-only mode.
 """
 
 from __future__ import annotations
 
+import tempfile
 import threading
+from pathlib import Path
 
 from app.config import Config
 from app.logger import get_logger
@@ -50,6 +56,10 @@ class Speaker:
                 engine = pyttsx3.init()
                 engine.setProperty("rate", self.cfg.tts_rate)
                 self._engine = engine
+                if self.cfg.speaker_device_index is not None:
+                    if self._speak_routed(engine, text):
+                        return
+                    log.warning("Routed playback failed; using system default speaker.")
                 engine.say(text)
                 engine.runAndWait()
             except Exception as exc:
@@ -61,6 +71,30 @@ class Speaker:
         self._thread = threading.Thread(target=_run, daemon=True)
         self._thread.start()
 
+    def _speak_routed(self, engine, text: str) -> bool:
+        """Render speech to a file and play it on the chosen output device."""
+        try:
+            import sounddevice as sd
+            import soundfile as sf
+        except ImportError:
+            log.warning("Speaker selection needs: pip install sounddevice soundfile")
+            return False
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                path = Path(tmp) / "tts.wav"  # macOS actually writes AIFF; soundfile
+                engine.save_to_file(text, str(path))  # detects format from content
+                engine.runAndWait()
+                if not path.exists() or path.stat().st_size == 0:
+                    return False
+                data, rate = sf.read(str(path), dtype="float32")
+                sd.play(data, rate, device=self.cfg.speaker_device_index)
+                sd.wait()
+            return True
+        except Exception as exc:
+            log.error("Routed TTS playback failed on device %s: %s",
+                      self.cfg.speaker_device_index, exc)
+            return False
+
     def stop(self) -> None:
         """Cut off any in-progress speech."""
         engine = self._engine
@@ -69,6 +103,11 @@ class Speaker:
                 engine.stop()
             except Exception:
                 pass
+        try:
+            import sounddevice as sd
+            sd.stop()  # also cuts routed playback
+        except Exception:
+            pass
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=1.0)
 

@@ -74,6 +74,7 @@ class Config:
     # TTS
     tts_provider: str = "pyttsx3"
     tts_rate: int = 180
+    speaker_device_index: int | None = None  # None = system default output
 
     # Storage
     database_path: Path = field(default_factory=lambda: PROJECT_ROOT / "data" / "jarvis.db")
@@ -116,7 +117,9 @@ class Config:
 def load_config(env_file: str | os.PathLike | None = None) -> Config:
     """Build a Config from environment variables (and optional .env file)."""
     if load_dotenv is not None:
-        load_dotenv(env_file or PROJECT_ROOT / ".env")
+        # override=True: .env is the source of truth, so settings edited via the
+        # dashboard apply on hot-restart instead of being shadowed by stale os.environ.
+        load_dotenv(env_file or PROJECT_ROOT / ".env", override=True)
 
     db_path = os.getenv("DATABASE_PATH", "")
     database_path = (
@@ -144,6 +147,7 @@ def load_config(env_file: str | os.PathLike | None = None) -> Config:
         wake_word_threshold=_float(os.getenv("WAKE_WORD_THRESHOLD"), 0.5),
         tts_provider=os.getenv("TTS_PROVIDER", "pyttsx3").strip().lower(),
         tts_rate=_int(os.getenv("TTS_RATE"), 180),
+        speaker_device_index=_opt_int(os.getenv("SPEAKER_DEVICE_INDEX")),
         database_path=database_path,
         memory_context_turns=_int(os.getenv("MEMORY_CONTEXT_TURNS"), 12),
         dashboard_host=os.getenv("DASHBOARD_HOST", "127.0.0.1").strip(),

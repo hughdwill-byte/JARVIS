@@ -164,13 +164,16 @@ class VoiceLoop(threading.Thread):
             print("  Couldn't make that out — say 'jarvis' and try again.")
             return
         print(f"\nyou (voice)> {text}")
+        self.assistant.record_activity("user_voice", text)
         if is_sleep_phrase(text):
             self.go_to_sleep()
+            self.assistant.record_activity("assistant", "Microphone off. Type anything to re-enable.")
             self.assistant.speaker.speak("Going quiet. Type anything when you need me.")
             return
         reply = self.assistant.handle(text)
         if reply.text:
             print(f"\njarvis> {reply.text}\n")
+            self.assistant.record_activity("assistant", reply.text)
             if reply.speak:
                 self.assistant.speaker.speak(reply.text)
 

@@ -41,7 +41,15 @@ Speaker test: step 1 of the first demo — the assistant speaks its reply.
 
 ## 6. Run
 ```powershell
+python run_app.py           # ← desktop app: chat + settings in its own window
 python run_assistant.py     # terminal assistant
-python run_dashboard.py     # then open http://127.0.0.1:8321
+python run_dashboard.py     # browser version, http://127.0.0.1:8321
 ```
 (Every new PowerShell window: `cd JARVIS` then `.venv\Scripts\activate` first.)
+
+Prefer double-click? Open the `launchers` folder and double-click **JARVIS.bat**
+(right-click → Send to → Desktop (create shortcut) to put it on your desktop).
+In the app, open **Settings** to pick your microphone, speaker and camera by name,
+paste the API key, and press **Save & Apply** — no file editing needed.
+The native window uses Windows' built-in WebView2 (already present on Windows 10/11);
+if it's somehow missing, JARVIS opens in your browser instead — same app.
