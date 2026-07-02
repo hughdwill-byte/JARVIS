@@ -20,6 +20,8 @@ pip install -r requirements.txt
 ```
 
 ## 3. API key
+Easiest: skip to step 5, start the app, and paste the key in **Settings → AI Brain →
+Save & Apply**. Or by file:
 ```bash
 cp .env.example .env
 open -e .env    # paste ANTHROPIC_API_KEY=sk-ant-... then save
@@ -73,7 +75,9 @@ which is why this project pins ONNX).
 Gotchas:
 - macOS mic permission must be granted to your Terminal app (step 4 above) — hands-free
   mode reads silence forever without it.
-- If it false-triggers on music/videos, raise `WAKE_WORD_THRESHOLD=0.6` in `.env`;
-  if it misses you, lower it to `0.4`.
-- External USB speakerphone: run `python -m app.audio.push_to_talk --list` and set
-  `MIC_DEVICE_INDEX` so it doesn't listen through the built-in laptop mic.
+- If it false-triggers on music/videos, raise the sensitivity slider in
+  **Settings → Hands-free wake word** to ~0.6; if it misses you, lower it to ~0.4.
+- External USB speakerphone: pick it by name in **Settings → Microphone & Speech** so
+  JARVIS doesn't listen through the built-in laptop mic, then run the 🎤 test.
+
+You're set up — day-to-day usage is covered in [`docs/USER_GUIDE.md`](../docs/USER_GUIDE.md).

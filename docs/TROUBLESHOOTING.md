@@ -1,19 +1,31 @@
 # Troubleshooting
 
-Run `python run_assistant.py --check` first — it tests every subsystem and prints the exact
-fix for anything missing. Then find your symptom below.
+**Start with the built-in diagnostics — they solve most problems for you:**
+
+1. In the app: **Settings → Device tests** — run 🔊 🎤 📷 🧠. Each failure message says
+   exactly what to fix.
+2. Wrong device? **Settings → pick the microphone/speaker/camera by name → Save & Apply**
+   (use *Scan for cameras* and *Rescan devices* after plugging things in).
+3. From a terminal: `python run_assistant.py --check` tests every subsystem with fix hints.
+
+Then find your symptom below.
 
 ## Camera not detected
-- Try `CAMERA_INDEX=1` (then 2) in `.env` — laptops' built-in cam is usually 0, USB cam 1.
-- Close Zoom/Teams/browser tabs holding the camera.
-- Different USB port (prefer direct, not hub). Re-plug and rerun `--check`.
+- **Settings → Camera & Vision → Scan for cameras**, pick the right one, Save & Apply,
+  then **Test camera** — the preview shows exactly what JARVIS sees.
+- Close Zoom/Teams/browser tabs holding the camera, then scan again.
+- Different USB port (prefer direct, not hub).
 - Linux: `ls /dev/video*` should list a device; add yourself to the video group:
   `sudo usermod -a -G video $USER` then log out/in.
 - macOS: System Settings → Privacy & Security → Camera → enable your terminal app.
 
 ## Microphone not detected / hears silence
-- `python -m app.audio.push_to_talk --list` — find your mic's number, set `MIC_DEVICE_INDEX` in `.env`.
+- **Settings → Microphone & Speech** — pick your mic by name (the ★ marks the system
+  default), Save & Apply, then **Test microphone**: it records 4 seconds and shows you what
+  it heard.
 - Check OS input volume isn't 0/muted; speak within ~1 m.
+- Terminal alternative: `python -m app.audio.push_to_talk --list` then set
+  `MIC_DEVICE_INDEX` in `.env`.
 - **Windows:** Settings → Privacy & security → Microphone → enable "Let desktop apps access
   your microphone" (this is the classic silent-failure cause).
 - **macOS:** System Settings → Privacy & Security → Microphone → enable Terminal/iTerm.
@@ -21,6 +33,9 @@ fix for anything missing. Then find your symptom below.
 - **Linux:** `sudo apt install libportaudio2`; check levels in `pavucontrol` (input tab).
 
 ## No sound output
+- **Settings → Speaker & Voice output** — pick your speaker by name, Save & Apply, then
+  **Test speaker**. "System default" follows your OS sound settings; picking a specific
+  device locks JARVIS to it regardless.
 - pyttsx3 backends: Windows/macOS work out of the box; **Linux needs** `sudo apt install espeak-ng`.
 - Check the OS default output device is your speaker; test with any music.
 - Raspberry Pi: force output with `sudo raspi-config` → System → Audio, and use
@@ -28,10 +43,11 @@ fix for anything missing. Then find your symptom below.
 - Still nothing? Set `TTS_PROVIDER=none` to run text-only while you sort the speaker.
 
 ## API key errors ("rejected", 401)
-- `.env` must contain exactly `ANTHROPIC_API_KEY=sk-ant-...` — no quotes, no spaces, no
-  trailing newline mid-key. Restart the assistant after editing.
+- Paste the key in **Settings → AI Brain**, Save & Apply, then **Test API key**. Make sure
+  you copied the whole key (they're long) with no extra spaces.
 - Key must be active with credit: check console.anthropic.com → Billing.
-- Make sure you copied the whole key (they're long).
+- Editing `.env` by hand instead? The line must be exactly `ANTHROPIC_API_KEY=sk-ant-...` —
+  no quotes, no spaces — then restart the app.
 
 ## Package install errors
 - Always inside the venv (`source .venv/bin/activate` / `.venv\Scripts\activate`).
@@ -50,8 +66,9 @@ fix for anything missing. Then find your symptom below.
   all >600 chars of pasted content.
 
 ## Expensive API usage
-- See [`COST_CONTROL.md`](COST_CONTROL.md). Quick wins: `LLM_MODEL_SMART=claude-haiku-4-5`,
-  `VISION_MAX_IMAGE_EDGE=768`, `MEMORY_CONTEXT_TURNS=6`, and a spend limit in the console.
+- See [`COST_CONTROL.md`](COST_CONTROL.md). Quick wins, all in **Settings**: set the
+  heavy-lifting model to Haiku (AI Brain), lower image detail to 768 (Camera & Vision),
+  reduce conversation memory to 6 turns (Advanced) — plus a spend limit in the Anthropic console.
 
 ## Bad image recognition
 - Light the desk — a desk lamp fixes most "it can't see anything" complaints.
@@ -61,7 +78,8 @@ fix for anything missing. Then find your symptom below.
 - Raise `VISION_MAX_IMAGE_EDGE=1568` temporarily for small text (costs a bit more).
 
 ## TTS sounds robotic
-- It is — pyttsx3 is the free offline engine. Adjust `TTS_RATE` (160–190 is most natural).
+- It is — pyttsx3 is the free offline engine. Adjust the speaking-speed slider in
+  **Settings → Speaker & Voice output** (160–190 is most natural).
 - Free upgrade: `pip install edge-tts` (Microsoft neural voices, needs internet) — swap the
   provider in `app/audio/text_to_speech.py`'s `speak()`; the class structure already isolates it.
 - Paid (ElevenLabs) only if voice quality really matters to you.
@@ -78,8 +96,19 @@ fix for anything missing. Then find your symptom below.
 - ALSA-only systems: set the default card in `~/.asoundrc`.
 - "device busy": another app holds the mic exclusively; close it.
 
-## Dashboard won't load
-- Is `run_dashboard.py` still running in its terminal? It must stay open.
-- Port taken → change `DASHBOARD_PORT` in `.env`.
+## App window / dashboard won't load
+- The window is blank on Windows → WebView2 runtime missing (rare on Win 10/11); JARVIS
+  falls back to your browser automatically — same app.
+- Browser version: is `run_dashboard.py` still running in its terminal? It must stay open.
+- Port taken → change the dashboard port in **Settings → Advanced** (or `DASHBOARD_PORT`
+  in `.env`), then restart the app.
 - It binds 127.0.0.1 (same machine only) by design; to reach it from your phone on your own
-  LAN set `DASHBOARD_HOST=0.0.0.0` — only on a network you trust.
+  LAN set `DASHBOARD_HOST=0.0.0.0` in `.env` — only on a network you trust.
+
+## Wake word problems
+- Doesn't hear "jarvis" → lower the sensitivity slider (Settings → Hands-free wake word)
+  to ~0.4; check the right mic is selected; speak from within ~2 m.
+- Triggers on TV/music/speech → raise sensitivity to ~0.6.
+- First start needs internet once to download the small wake model (~5MB).
+- Mac: `pip install onnxruntime` must have succeeded — rerun
+  `pip install -r requirements.txt` if hands-free reports it missing.

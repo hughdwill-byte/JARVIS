@@ -20,6 +20,8 @@ pip install -r requirements.txt
 ```
 
 ## 3. API key
+Easiest: skip to step 6, start the app, and paste the key in **Settings → AI Brain →
+Save & Apply**. Or by file:
 ```powershell
 copy .env.example .env
 notepad .env
@@ -53,3 +55,5 @@ In the app, open **Settings** to pick your microphone, speaker and camera by nam
 paste the API key, and press **Save & Apply** — no file editing needed.
 The native window uses Windows' built-in WebView2 (already present on Windows 10/11);
 if it's somehow missing, JARVIS opens in your browser instead — same app.
+
+You're set up — day-to-day usage is covered in [`docs/USER_GUIDE.md`](../docs/USER_GUIDE.md).

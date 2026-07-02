@@ -1,7 +1,9 @@
 # Hardware guide — bill of materials
 
 You handle everything on this page (buying, mounting, plugging in). No soldering, no
-electronics skills needed at any tier.
+electronics skills needed at any tier. Once things are plugged in, you select which
+microphone/speaker/camera JARVIS uses from dropdowns in the app's **Settings** page —
+no configuration files.
 
 ## Which build to do first
 
@@ -75,6 +77,8 @@ sensors, no Pi. The MVP proves the software loop first; gadgets come after.
 - **Optional screen (Tier C):** propped at the back of the desk showing the dashboard
   (`python run_dashboard.py`, browser in kiosk/fullscreen mode).
 - Route cables along the desk edge; label the webcam's USB plug so you can find it.
+- **Aiming the camera:** use Settings → Device tests → *Test camera* in the app — it shows
+  exactly what JARVIS sees, so adjust the mount until the whole work surface is in frame.
 
 ## Shopping summary — what to actually order today (Tier B)
 

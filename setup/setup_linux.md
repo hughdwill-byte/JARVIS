@@ -23,6 +23,8 @@ pip install -r requirements.txt
 ```
 
 ## 3. API key
+Easiest: skip to step 5, start the app, and paste the key in **Settings → AI Brain →
+Save & Apply**. Or by file:
 ```bash
 cp .env.example .env
 nano .env    # paste ANTHROPIC_API_KEY=sk-ant-... — Ctrl+O to save, Ctrl+X to exit
@@ -40,6 +42,13 @@ the mic test runs. More fixes: `docs/TROUBLESHOOTING.md`.
 
 ## 5. Run
 ```bash
-python run_assistant.py
-python run_dashboard.py    # http://127.0.0.1:8321
+python run_app.py          # ← desktop app: chat + settings in a native window
+python run_assistant.py    # terminal version
+python run_dashboard.py    # browser version, http://127.0.0.1:8321
 ```
+Note: the native window needs GTK/QT webview libs on Linux
+(`sudo apt install gir1.2-webkit2-4.1 python3-gi` on Ubuntu); if missing, `run_app.py`
+automatically opens in your browser instead — same app.
+
+In the app, open **Settings** to pick your microphone, speaker and camera by name and run
+the device tests. Day-to-day usage: [`docs/USER_GUIDE.md`](../docs/USER_GUIDE.md).

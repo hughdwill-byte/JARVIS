@@ -2,13 +2,20 @@
 
 ## Plain-English overview
 
-One Python process is the assistant (`app/assistant.py`). Two thin front-ends drive it: a
-terminal loop (`run_assistant.py`) and a local Flask dashboard (`run_dashboard.py`). Input —
-typed, or recorded via push-to-talk and transcribed locally — goes to a **router**: slash
-commands run local tools directly; everything else goes to the **LLM brain** with a compact
-context block (latest desk summary, open tasks, recent notes, approved preferences, last N
-conversation turns). Replies print to screen and are optionally spoken by a local TTS engine.
-All state lives in one SQLite file you can copy, inspect, or delete.
+One Python process is the assistant (`app/assistant.py`). Three thin front-ends drive it:
+the desktop app (`run_app.py` — the Flask dashboard in a native pywebview window), the
+browser dashboard (`run_dashboard.py`), and a terminal loop (`run_assistant.py`). Input —
+typed, or spoken (wake-word or push-to-talk, transcribed locally) — goes to a **router**:
+slash commands run local tools directly; everything else goes to the **LLM brain** with a
+compact context block (latest desk summary, open tasks, recent notes, approved preferences,
+last N conversation turns). Replies print to screen and are optionally spoken by a local
+TTS engine. All state lives in one SQLite file you can copy, inspect, or delete.
+
+**Settings** (`app/dashboard/settings.py`) is schema-driven: one list of field definitions
+renders the whole Settings page, validates writes, and persists to `.env` (comments
+preserved, unknown keys rejected, the API key masked and never echoed back). *Save & Apply*
+hot-swaps the running Assistant with a freshly-loaded config, so changes apply in ~1 second
+without restarting the process.
 
 ## Voice data flow
 
@@ -16,13 +23,16 @@ All state lives in one SQLite file you can copy, inspect, or delete.
 sequenceDiagram
     participant U as You
     participant M as Mic (sounddevice)
+    participant WW as openWakeWord (LOCAL)
     participant W as faster-whisper (LOCAL)
     participant A as Assistant/Router
     participant C as Claude API (CLOUD)
     participant T as pyttsx3 TTS (LOCAL)
-    U->>M: /voice, press Enter, speak, Enter
-    Note over M: [MIC ACTIVE] banner shown
-    M->>W: float32 audio buffer (never leaves machine)
+    U->>M: "jarvis" (or /voice push-to-talk)
+    Note over M,WW: [MIC ACTIVE] — chunks scored locally,<br/>discarded until wake word fires
+    M->>WW: 80ms chunks
+    WW->>M: wake! record until you pause
+    M->>W: audio buffer (never leaves machine)
     W->>A: transcript text
     A->>C: text + trimmed context (only free-chat; commands stay local)
     C->>A: reply text
@@ -52,6 +62,7 @@ sequenceDiagram
 
 | Layer | Where | Cost |
 |---|---|---|
+| Wake word detection (openWakeWord) | Local | Free |
 | Speech-to-text (faster-whisper) | Local | Free |
 | Text-to-speech (pyttsx3) | Local | Free |
 | OCR (`/ocr`, tesseract) | Local | Free |
@@ -97,9 +108,12 @@ Sending data to a cloud API is the price of a strong brain. What this design doe
 - **Text: your messages and stored context go to the API** — don't paste secrets/passwords
   into chat. Anthropic's API terms do not train on API data by default, but treat any cloud
   service as "someone else's computer".
-- **Nothing is always-on.** Push-to-talk opens the mic per-utterance. The optional wake-word
-  mode keeps the mic streaming (processed locally, clearly labelled) and is off by default.
-- **Everything visible:** `[CAMERA ACTIVE]`/`[MIC ACTIVE]` banners in the terminal; red
-  CAMERA ACTIVE pill in the dashboard header; `/status` shows every device's state.
+- **The camera is never always-on.** For the mic, hands-free wake-word mode does keep the
+  device streaming — but every chunk is scored locally and discarded, nothing is stored or
+  uploaded until the wake word fires, and saying "shutdown" closes the device entirely.
+  Turn it off in Settings for strict push-to-talk-only operation (mic opens per-utterance).
+- **Everything visible:** `[CAMERA ACTIVE]`/`[MIC ACTIVE]` banners in the terminal; the
+  app header shows live MIC LISTENING / CAMERA ACTIVE / LLM pills (the mic pill is also the
+  on/off toggle); `/status` shows every device's state.
 - **Memory under your control:** `/memories` lists all long-term facts, `/forget` deletes,
   and nothing is stored long-term without your explicit `/remember`.

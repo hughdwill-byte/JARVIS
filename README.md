@@ -1,104 +1,113 @@
 # JARVIS — Desk Assistant
 
-A cheap, buildable, privacy-conscious AI desk assistant. It sees your desk through a webcam,
-listens via push-to-talk, talks back through a speaker, and helps with university work,
-coding, and personal projects — with a calm, slightly witty JARVIS-style persona.
+A cheap, buildable, privacy-conscious AI assistant that lives on your desk. Say **"jarvis"**
+and talk to it. It sees your desk through a webcam, answers through your speaker, and helps
+with university work, coding, and personal projects — with a calm, slightly witty persona.
+Runs as a desktop app on **macOS and Windows** (Linux and Raspberry Pi too).
 
-**Role split:** all software in this repo is complete and runnable. Your job is only the
-physical side: buy hardware, plug things in, run the commands below, and paste in one API key.
-
----
-
-## What it does (MVP)
-
-- **Chat**: typed (terminal or web dashboard) or spoken (push-to-talk) conversation with a
-  Claude-powered brain that knows your notes, tasks, and latest desk snapshot.
-- **Vision**: `/desk` photographs your desk and describes it; `/look where is my calculator?`;
-  `/read` reads a page you hold up; `/changes` tells you what changed since last time.
-- **Voice**: hands-free mode — say **"jarvis"** to talk (local wake-word detection, works
-  on macOS/Windows/Linux/Pi), say **"shutdown"** to close the mic completely, type anything
-  (or `/listen`) to re-arm it. Plus push-to-talk (`/voice`), offline speech-to-text
-  (faster-whisper), offline text-to-speech (pyttsx3), and `/stop` to cut speech off.
-- **Memory**: notes, tasks, reminders, and long-term preferences — stored **only** when you
-  ask, listed with `/memories`, deleted with `/forget`. Everything lives in one local SQLite file.
-- **Uni tools**: `/plan` (assignment planner), `/flashcards`, `/explain`, `/timetable`,
-  `/cite`, `/doc` (PDF summariser), `/project` (project-folder Q&A), `/code`, `/run`.
-
-**Non-goals / integrity:** it will not write assignments for submission, answer quizzes/exams,
-or help pass off AI work as yours. It tutors, explains, plans, reviews, and debugs. It also
-never records continuously — camera and mic activate only on explicit commands, with visible
-`[CAMERA ACTIVE]` / `[MIC ACTIVE]` indicators in the terminal and dashboard.
+No coding is required to set it up or use it. If you can install an app and click through a
+settings screen, you can run JARVIS.
 
 ---
 
-## Quick start (any OS)
+## New here? Start in this order
+
+1. **[docs/HARDWARE.md](docs/HARDWARE.md)** — what to buy (~$50–70: a webcam and a USB
+   speakerphone; your existing computer does the thinking).
+2. **[docs/BUILD_CHECKLIST.md](docs/BUILD_CHECKLIST.md)** — your complete to-do list, from
+   ordering parts to the first conversation. Nothing on it involves code.
+3. **Your OS guide in [setup/](setup/)** — copy-paste install commands for
+   [Windows](setup/setup_windows.md) · [macOS](setup/setup_macos.md) ·
+   [Linux](setup/setup_linux.md) · [Raspberry Pi](setup/setup_raspberry_pi.md).
+4. **[docs/USER_GUIDE.md](docs/USER_GUIDE.md)** — how to actually use JARVIS day-to-day:
+   talking to it, every command explained, study workflows, memory control.
+5. Something not working? **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)**.
+
+## The 10-minute version
+
+On a computer with [Python 3.10+](https://python.org) and [Git](https://git-scm.com) installed:
 
 ```bash
-git clone <this repo> && cd JARVIS
+git clone <this-repo-url> JARVIS && cd JARVIS
 python3 -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -r requirements.txt  # audio/vision extras are optional — see setup/ guides
-cp .env.example .env             # then paste your ANTHROPIC_API_KEY into .env
-python run_assistant.py --check  # first-run self test with per-component fix hints
-python run_app.py                # ← the desktop app (chat + settings in one window)
-python run_assistant.py          # terminal assistant (same brain)
-python run_dashboard.py          # browser version of the app
+source .venv/bin/activate          # Windows PowerShell: .venv\Scripts\activate
+pip install -r requirements.txt
+python run_app.py                  # opens the JARVIS desktop app
 ```
 
-**Desktop app:** `run_app.py` opens JARVIS in its own native window on macOS and Windows.
-Double-clickable launchers are in [`launchers/`](launchers/) — `JARVIS.command` (Mac,
-`chmod +x` it once) and `JARVIS.bat` (Windows, right-click → Send to → Desktop for a
-shortcut). The app's **Settings page** lets you change everything without touching a file:
-pick your microphone/speaker/camera by name, paste the API key, tune the wake word, then
-hit *Save & Apply* — changes go live instantly, and each device has a Test button that
-tells you exactly what's wrong if it fails.
+Then, **inside the app**:
 
-No API key? Everything local still works (notes, tasks, snapshots, OCR, reminders) and the
-assistant tells you exactly what to add to enable the brain. Detailed per-OS instructions,
-including microphone/camera permission steps: [`setup/`](setup/).
+1. Click **Settings** (top-left).
+2. Paste your Claude API key (free to create at [console.anthropic.com](https://console.anthropic.com);
+   typical cost $5–10/month — see [docs/COST_CONTROL.md](docs/COST_CONTROL.md)).
+3. Pick your **microphone**, **speaker**, and **camera** from the dropdowns — real device
+   names, no guessing at index numbers.
+4. Click **Save & Apply** (changes are live in about a second — no restart).
+5. Run the four **Device test** buttons at the bottom: 🔊 speaker, 🎤 microphone, 📷 camera,
+   🧠 API key. Each one tells you exactly what to fix if it fails.
 
-## First demo (proves the whole MVP)
+That's the whole setup. No file editing — the Settings page manages the config for you.
+(Prefer files? Copy `.env.example` to `.env` and edit it; the app and the files stay in sync.)
 
-Run `python run_assistant.py`, then:
+**Make it feel like an app:** double-click `launchers/JARVIS.command` on Mac
+(run `chmod +x launchers/JARVIS.command` once first) or `launchers/JARVIS.bat` on Windows
+(right-click → Send to → Desktop for a shortcut).
 
-| Step | Type this | You should see/hear |
-|---|---|---|
-| 1 | `hello, introduce yourself` | A short spoken JARVIS-style reply |
-| 2 | `/snapshot` | `[CAMERA ACTIVE]` then a saved photo path |
-| 3 | `/desk` | A spoken description of what's on your desk |
-| 4 | `/look where is my phone?` | A location answer ("left of the keyboard…") |
-| 5 | `/note check tutorial times` then `/notes` | The note saved and listed |
-| 6 | `/task finish lab report due friday` then `/tasks` | The task with its due date |
-| 7 | `/remind 1m stand up` and wait a minute | A spoken reminder fires |
-| 8 | (move something on the desk) `/desk` then `/changes` | "appeared: … / gone: …" |
-| 9 | `/voice`, speak, press Enter | Your words transcribed and answered |
-| 10 | Say **"jarvis"**, wait for the beep, ask something | Hands-free answer, no typing |
-| 11 | Say **"jarvis"**, then **"shutdown"** | `[MIC OFF]` — mic fully released; type anything to re-arm |
+## Your first conversation
 
-## Commands
+With the app open (or `python run_assistant.py` in a terminal):
 
-Type `/help` for the live list. Highlights:
+| Try | What happens |
+|---|---|
+| Say **"jarvis"**, wait for the beep, ask *"what's on my desk?"* | It photographs the desk and describes it out loud |
+| Say **"jarvis"**, then *"shutdown"* | Microphone turns fully off (`MIC OFF` in the header) |
+| Type anything | Microphone re-arms — say "jarvis" again anytime |
+| Type `/task finish lab report due friday` | Task saved; it appears in the sidebar |
+| Type `/note tutor said use APA 7` then `/notes` | Note saved and listed |
+| Type `/remind 25m stretch` | A spoken reminder fires in 25 minutes |
+| Type `/desk`, move something, `/desk` again, then `/changes` | "appeared: …; gone: …" |
+| Type `/flashcards TCP three-way handshake` | Instant practice flashcards |
+| Type `/help` | The full command list |
 
-```
-/desk /snapshot /read /ocr /look /changes /scenes      vision
-/note /notes /remember /memories /forget               memory (user-controlled)
-/task /tasks /done /remind /reminders                  productivity
-/doc /docq /project /projq                             documents & code projects
-/plan /flashcards /explain /timetable /cite            uni tools
-/code /run                                             coding help + sandboxed runner
-/listen /sleep /voice /stop /status /clear             voice & control
-```
+Anything you type or say **without** a `/` is normal conversation with the AI — it knows
+your open tasks, recent notes, and the latest desk snapshot. The complete manual, including
+study workflows and PDF/project features, is **[docs/USER_GUIDE.md](docs/USER_GUIDE.md)**.
 
-Anything without a `/` goes straight to the AI brain. Natural phrases like
-"what's on my desk" or "stop talking" route automatically.
+## What it can do
 
-## Architecture
+- **Talk hands-free** — local wake-word detection ("jarvis"), local speech-to-text, offline
+  text-to-speech; `/stop` interrupts it mid-sentence.
+- **See your desk** — `/desk` describe, `/look where are my keys?`, `/read` a held-up page,
+  `/ocr` free local text reading, `/changes` what moved since last time.
+- **Remember, on your terms** — notes, tasks, reminders; long-term facts stored only via
+  `/remember`, listed with `/memories`, deleted with `/forget`.
+- **Help you study** — `/plan` assignment milestones, `/flashcards`, `/explain`,
+  `/timetable`, `/cite`, `/doc` PDF summaries + follow-up Q&A.
+- **Help you build** — `/project` loads a code folder for Q&A, `/code` debugs with
+  explanations, `/run` executes small Python snippets in a sandbox.
+
+**What it won't do:** write assignments/essays for submission, answer quizzes or exams, or
+help disguise AI work as yours. It's a tutor, not a ghostwriter — it declines and offers the
+legitimate version (outline, feedback, explanation) instead. It also never records
+continuously and never stores camera images long-term.
+
+## Three ways to run it
+
+| Command | What you get |
+|---|---|
+| `python run_app.py` | **The desktop app** — chat + settings in a native window (recommended) |
+| `python run_assistant.py` | Terminal version — same brain, plus `--check` self-test |
+| `python run_dashboard.py` | Browser version at http://127.0.0.1:8321 — same app as `run_app.py` |
+
+All three share the same memory database. Run one at a time (they'd compete for the mic).
+
+## Architecture (for the curious)
 
 ```mermaid
 flowchart LR
     subgraph Inputs
-        KB[Keyboard / Dashboard] --> R
-        MIC[Mic push-to-talk] -->|faster-whisper STT, local| R
+        KB[Keyboard / App] --> R
+        MIC[Mic: wake word + Whisper STT, all local] --> R
         CAM[Webcam snapshot] -->|resized JPEG| VA
     end
     R[Router] -->|/commands| T[Tools: tasks, notes,\nreminders, docs, study, code]
@@ -108,45 +117,35 @@ flowchart LR
     B <--> DB
     B --> OUT[Reply]
     OUT -->|pyttsx3 TTS, local| SPK[Speaker]
-    OUT --> UI[Terminal / Dashboard]
+    OUT --> UI[App / Terminal]
 ```
 
-**Local (free):** STT, TTS, OCR, camera capture, database, dashboard, routing, task/note logic.
-**Cloud (paid, one key):** Claude API for chat and image understanding — the only paid piece.
-Cost controls are built in: cheap-model routing, image downscaling before upload, trimmed
-conversation context, and local pre-checks that avoid API calls entirely. Full details:
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/COST_CONTROL.md`](docs/COST_CONTROL.md).
-
-## Hardware
-
-Start with **Tier B**: any existing laptop/desktop + a 1080p USB webcam (~$25) + a USB
-speakerphone puck (~$25–35), total **~$50–60** if you already own a computer. Don't buy a
-Raspberry Pi, wake-word button, or LED ring yet. Full bill of materials with three tiers,
-shopping search terms, what to avoid, and camera/mic placement: [`docs/HARDWARE.md`](docs/HARDWARE.md).
-Your physical to-do list: [`docs/BUILD_CHECKLIST.md`](docs/BUILD_CHECKLIST.md).
+**Local & free:** wake word, speech-to-text, text-to-speech, OCR, camera, database, settings
+app, all task/note logic. **Cloud & paid:** the Claude API for chat and image understanding —
+the only paid piece, with cost controls built in (cheap-model routing, image downscaling,
+trimmed context). Deep dive: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Repository layout
 
 ```
-run_app.py              desktop app (native window: chat + settings)
+run_app.py              desktop app (native window: chat + settings) — start here
 run_assistant.py        terminal front-end (+ --check self test)
-run_dashboard.py        web dashboard front-end
+run_dashboard.py        browser version of the app
 launchers/              double-clickable starters for Mac (.command) and Windows (.bat)
 app/
   assistant.py          core: wires everything, registers all /commands
-  config.py             .env loader with safe defaults
+  config.py             settings loader (.env) with safe defaults
   prompts.py            JARVIS persona + vision prompts + integrity rules
-  logger.py             console + rotating file logs (data/logs/)
-  audio/                push_to_talk, speech_to_text, text_to_speech, wake_word
+  audio/                voice_loop (wake word), push_to_talk, STT, TTS
   vision/               camera, image_analyzer, ocr, scene_memory
   brain/                llm_client (model routing), router, tool_manager
   memory/               database (SQLite), notes, preferences
   tools/                tasks, reminders, documents, project_files, study_tools, code_helper
-  dashboard/            Flask server + chat page + settings app (schema-driven)
+  dashboard/            the app UI: chat page, settings page, device tests
   tests/                pytest suite (runs with zero devices and zero keys)
-setup/                  per-OS install guides (Windows/macOS/Linux/Raspberry Pi)
-docs/                   hardware BOM, architecture, cost control, troubleshooting, checklist
-data/                   created at runtime (DB, snapshots, logs) — gitignored, never committed
+setup/                  per-OS install guides
+docs/                   user guide, hardware, architecture, cost, troubleshooting, checklist
+data/                   created at runtime (DB, snapshots, logs) — gitignored, deletable
 ```
 
 ## Tests
@@ -155,32 +154,29 @@ data/                   created at runtime (DB, snapshots, logs) — gitignored,
 python -m pytest app/tests -q
 ```
 
-37 tests covering config, memory, tasks/reminders, scene memory, LLM fallback, document
-ingestion, and study tools. They run with no camera, no mic, and no API key — CI-safe.
+52 tests covering config, memory, tasks/reminders, scene memory, LLM fallback, documents,
+study tools, the voice loop, and the settings app. All pass with no camera, no mic, and no
+API key.
 
 ## Privacy model
 
-- Camera is **command-triggered only**; visible active-state indicators everywhere.
-- Hands-free mode streams the mic **only to score the wake word locally** — chunks are
-  discarded immediately, nothing is stored or uploaded until you say "jarvis". Saying
-  "shutdown" (or `/sleep`) **closes the microphone device entirely** (`[MIC OFF]`);
-  the `[MIC ACTIVE]` banner shows whenever it's open. Set `WAKE_WORD_ENABLED=false`
-  for strict push-to-talk-only operation.
-- Snapshots auto-delete after `SNAPSHOT_RETENTION_DAYS` (set `0` to keep none); long-term
-  scene memory stores text descriptions, never images.
-- Long-term memory is opt-in per item and fully listable/deletable by you.
-- What goes to the cloud: your typed/transcribed text and (only for vision commands) one
-  downscaled snapshot per command. Audio never leaves the machine. Trade-offs discussed in
-  [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#privacy-trade-offs).
+- **Camera:** turns on only for explicit commands (`/desk`, `/snapshot`, …) with a visible
+  `CAMERA ACTIVE` indicator; snapshots auto-delete after a retention period you control
+  (Settings → Camera & Vision); long-term memory keeps text descriptions, never images.
+- **Microphone:** hands-free mode streams audio **only to score the wake word locally** —
+  chunks are checked and discarded, nothing stored or uploaded until you say "jarvis".
+  Saying "shutdown" closes the device entirely. Turn hands-free off in Settings for strict
+  push-to-talk-only operation.
+- **Memory:** long-term facts are stored only when you ask (`/remember`), and `/memories` /
+  `/forget` give you full inventory and deletion.
+- **Cloud:** your message text and (for vision commands only) one downscaled snapshot go to
+  the Claude API. Raw audio never leaves the machine. Full trade-offs:
+  [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#privacy-trade-offs).
 
-## Upgrades after the MVP
+## What's next after setup
 
-Already scaffolded in the codebase, in recommended order:
-
-1. **Voice polish** — nicer TTS voices (edge-tts), audio device selection
-   (`python -m app.audio.push_to_talk --list`). Wake word is already built in.
-2. **Vision polish** — local OCR (`/ocr`, install tesseract), tighter retention settings.
-3. **Bigger brain features** — calendar integration, web search tool, GitHub awareness.
-
-Something broken? [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) has fixes for every
-common failure (camera index, mic permissions, audio on Linux, Pi performance, API errors).
+1. Live with it for a week; tune wake sensitivity and voice speed in Settings.
+2. Nicer voice: `pip install edge-tts` (free Microsoft neural voices — swap noted in
+   [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#tts-sounds-robotic)).
+3. Bigger ideas: calendar integration, web search tool, a dedicated mini-PC or Pi so JARVIS
+   is always on ([setup/setup_raspberry_pi.md](setup/setup_raspberry_pi.md)).

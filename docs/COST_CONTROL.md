@@ -36,12 +36,16 @@ Set a hard spending limit in the Anthropic console (Settings → Limits) — do 
 - Free local paths: `/ocr` instead of `/read` for clean print; `/changes` costs $0;
   tasks/notes/reminders never touch the API.
 
-## Knobs you can turn in `.env`
+## Knobs you can turn (all in the app: Settings → Save & Apply)
 
-- `LLM_MODEL_SMART=claude-haiku-4-5` — run everything on Haiku (cheapest, weaker vision).
-- `LLM_MAX_TOKENS=512` — shorter replies.
-- `MEMORY_CONTEXT_TURNS=6` — less history per call.
-- `VISION_MAX_IMAGE_EDGE=768` — cheaper vision calls.
+- **AI Brain → Heavy-lifting model = claude-haiku-4-5** — run everything on Haiku
+  (cheapest, weaker vision).
+- **AI Brain → Max reply length = 512** — shorter replies.
+- **Advanced → Conversation memory = 6** — less history sent per call.
+- **Camera & Vision → Image detail = 768** — cheaper vision calls.
+
+(The same settings exist as `LLM_MODEL_SMART`, `LLM_MAX_TOKENS`, `MEMORY_CONTEXT_TURNS`,
+and `VISION_MAX_IMAGE_EDGE` in `.env` if you prefer editing files.)
 
 ## Which paid things are worth it
 

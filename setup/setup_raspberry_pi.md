@@ -49,9 +49,12 @@ silently halves performance).
 
 ## 5. Run (and optional auto-start)
 ```bash
-python run_assistant.py
-python run_dashboard.py    # http://<pi-ip>:8321 from another device needs DASHBOARD_HOST=0.0.0.0
+python run_assistant.py    # terminal (recommended on a headless Pi)
+python run_dashboard.py    # browser app: http://<pi-ip>:8321 from another device needs DASHBOARD_HOST=0.0.0.0
 ```
+Configure devices from the browser app's **Settings** page (microphone/speaker/camera
+dropdowns + test buttons) — easier than editing `.env` over SSH. Day-to-day usage:
+[`docs/USER_GUIDE.md`](../docs/USER_GUIDE.md).
 Auto-start the dashboard on boot:
 ```bash
 sudo tee /etc/systemd/system/jarvis-dashboard.service > /dev/null <<'EOF'
