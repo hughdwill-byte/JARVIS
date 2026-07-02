@@ -34,7 +34,16 @@ source .venv/bin/activate          # Windows PowerShell: .venv\Scripts\activate
 pip install -r requirements.txt
 python run_app.py                  # opens the JARVIS desktop app
 ```
+To just launch an updated version after updates launch:
 
+```bash
+cd ~/JARVIS
+source .venv/bin/activate
+git stash
+git pull
+pip install -r requirements.txt
+python run_app.py
+```
 Then, **inside the app**:
 
 1. Click **Settings** (top-left).
