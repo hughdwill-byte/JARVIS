@@ -1,20 +1,77 @@
 {
-  "_readme": "Copy this file to mcp_servers.json and keep only the apps you want. Same format as Claude Desktop's config, so any MCP server example from the internet pastes straight in. Most servers run via npx and need Node.js installed (nodejs.org). Full walkthrough incl. Gmail OAuth setup: docs/COMPUTER_AND_APPS.md",
+  "_readme": "Copy this file to mcp_servers.json and DELETE the apps you don't use (keep the JSON valid — no trailing commas). Same format as Claude Desktop, so any MCP server example online pastes straight in. Most run via npx and need Node.js (nodejs.org). Each app needs its own one-time login/auth per its README. Package names in the MCP ecosystem change often — if npx can't find one, ask JARVIS (or Cowork) to find the current package. Full walkthrough: docs/COMPUTER_AND_APPS.md",
+
   "mcpServers": {
     "gmail": {
       "command": "npx",
       "args": ["-y", "@gongrzhe/server-gmail-autoauth-mcp"]
     },
-    "calendar": {
+
+    "google-calendar": {
       "command": "npx",
-      "args": ["-y", "mcp-google-calendar-plus"],
+      "args": ["-y", "@cocal/google-calendar-mcp"],
       "env": {
         "GOOGLE_OAUTH_CREDENTIALS": "/absolute/path/to/gcp-oauth.keys.json"
       }
     },
-    "extra-files": {
+
+    "google-drive": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/another/folder"]
+      "args": ["-y", "@modelcontextprotocol/server-gdrive"]
+    },
+
+    "notion": {
+      "command": "npx",
+      "args": ["-y", "@notionhq/notion-mcp-server"],
+      "env": {
+        "NOTION_TOKEN": "secret_your_notion_integration_token"
+      }
+    },
+
+    "slack": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-slack"],
+      "env": {
+        "SLACK_BOT_TOKEN": "xoxb-your-token",
+        "SLACK_TEAM_ID": "T01234567"
+      }
+    },
+
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_your_token"
+      }
+    },
+
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem",
+               "/Users/YOU/Documents", "/Users/YOU/Desktop"]
+    },
+
+    "brave-search": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+      "env": {
+        "BRAVE_API_KEY": "your_brave_api_key"
+      }
+    },
+
+    "apple": {
+      "command": "npx",
+      "args": ["-y", "@dhravya/apple-mcp"],
+      "_note": "macOS only: Notes, Reminders, Messages, Contacts, Calendar. Grant Automation/Full Disk Access permissions when macOS prompts."
+    },
+
+    "spotify": {
+      "command": "npx",
+      "args": ["-y", "@marcelmarais/spotify-mcp-server"],
+      "env": {
+        "SPOTIFY_CLIENT_ID": "your_client_id",
+        "SPOTIFY_CLIENT_SECRET": "your_client_secret"
+      }
     }
   }
 }

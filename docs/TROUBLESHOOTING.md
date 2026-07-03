@@ -131,6 +131,17 @@ steps. (Newer JARVIS versions detect this and print these instructions automatic
 - Everything feels slow → that's the trade-off of this backend (~4–8s per reply);
   use `hybrid` so chat stays on the fast API.
 
+## JARVIS talks over itself / sentences overlap
+Fixed: on macOS JARVIS now speaks via the built-in `say` command, which finishes each
+sentence before the next begins (pyttsx3's runAndWait returned early on macOS, causing the
+overlap). If you still hear it:
+- Make sure you've pulled the latest and restarted (`/status` shows the version).
+- If you selected a specific speaker device, playback routes through sounddevice — confirm
+  `soundfile` is installed (`pip install soundfile`).
+Voice note (macOS): the voice you pick in Settings maps to a `say` voice by name. If a
+chosen voice is silent, open Terminal and run `say -v '?'` to see installed voices; download
+more via System Settings → Accessibility → Spoken Content → Manage Voices.
+
 ## JARVIS reacts to its own voice (feedback loop)
 Three layers of protection are built in: wake detection is suspended while it speaks and
 for ~0.8s after (echo tail), and follow-up transcripts that mostly match what it just said

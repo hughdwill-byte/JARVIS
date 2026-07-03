@@ -1,21 +1,27 @@
-"""Text-to-speech: queued, streamable, stoppable.
+"""Text-to-speech: queued, streamable, stoppable, no overlap.
 
-Sentences are played from a queue by one worker thread, so streamed LLM
-output can start being spoken while the rest is still being written.
+Sentences are played from a queue by ONE worker thread, so streamed LLM
+output can start being spoken while the rest is still being written — but the
+worker only starts the next sentence once the current one has ACTUALLY
+finished playing. Getting that "actually finished" right is the whole trick:
 
-macOS quirk handled here: the nsss driver's runAndWait can return before the
-audio actually finishes. Each item therefore also honours a minimum duration
-estimated from word count, so is_speaking/wait() reflect real audio time —
-the hands-free follow-up window depends on this being accurate.
+- macOS: `pyttsx3`'s runAndWait returns before audio ends (nsss driver), which
+  made sentences overlap. So on macOS we shell out to the built-in `say`
+  binary, which blocks until playback completes — no overlap, and better
+  voices. Voice/rate map straight onto `say -v`/`say -r`.
+- Windows/Linux: pyttsx3 runAndWait blocks correctly, so we use it directly.
+- A specific output device (SPEAKER_DEVICE_INDEX) is honoured by rendering to
+  a file and playing it through sounddevice+soundfile (sd.wait() blocks).
 
-Speaker selection: with SPEAKER_DEVICE_INDEX set, speech renders to a file
-and plays on that device via sounddevice+soundfile. Fallback chain:
-routed -> direct pyttsx3 -> text-only (never crashes).
+Fallback chain never crashes: preferred path -> pyttsx3 -> text-only.
 """
 
 from __future__ import annotations
 
 import queue
+import shutil
+import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -26,7 +32,8 @@ from app.logger import get_logger
 
 log = get_logger("tts")
 
-_QUEUE_END_POLL_S = 0.05
+_POLL_S = 0.05
+_IS_MAC = sys.platform == "darwin"
 
 
 class Speaker:
@@ -35,14 +42,17 @@ class Speaker:
         self._queue: "queue.Queue[str]" = queue.Queue()
         self._worker: threading.Thread | None = None
         self._busy = threading.Event()
-        self._skip = threading.Event()  # set by stop(): abandon current + queued
-        self._engine = None
+        self._skip = threading.Event()   # set by stop(): abandon current + queued
+        self._engine = None              # active pyttsx3 engine (if any)
+        self._proc: subprocess.Popen | None = None  # active `say` process (if any)
         self._enabled = cfg.tts_provider == "pyttsx3"
-        self.last_text: str = ""        # what JARVIS last said (echo filtering)
-        self._finished_at: float = 0.0  # monotonic time speech last ended
-        if self._enabled:
+        self.last_text: str = ""         # what JARVIS last said (echo filtering)
+        self._finished_at: float = 0.0   # monotonic time speech last ended
+        self._say = shutil.which("say") if _IS_MAC else None
+        self._voice_name_cache: dict[str, str] | None = None
+        if self._enabled and not self._say:
             try:
-                import pyttsx3  # noqa: F401  (probe only; engines are per-utterance)
+                import pyttsx3  # noqa: F401  (probe; engines are per-utterance)
             except ImportError:
                 log.warning("pyttsx3 not installed — replies will be text-only. "
                             "pip install pyttsx3")
@@ -80,7 +90,7 @@ class Speaker:
         if not self._enabled or not text:
             return
         if not self.is_speaking:
-            self.last_text = text  # fresh utterance
+            self.last_text = text
         else:
             self.last_text = (self.last_text + " " + text)[-800:]
         self._ensure_worker()
@@ -88,35 +98,38 @@ class Speaker:
 
     def stop(self) -> None:
         """Cut off current speech and drop anything queued."""
-        while True:  # drop queued items
+        while True:
             try:
                 self._queue.get_nowait()
                 self._queue.task_done()
             except queue.Empty:
                 break
         self._skip.set()
-        engine = self._engine
-        if engine is not None:
+        if self._proc is not None:
             try:
-                engine.stop()
+                self._proc.terminate()
+            except Exception:
+                pass
+        if self._engine is not None:
+            try:
+                self._engine.stop()
             except Exception:
                 pass
         try:
             import sounddevice as sd
-            sd.stop()  # cuts routed playback
+            sd.stop()
         except Exception:
             pass
-        # give the worker a moment to notice; don't block long
-        deadline = time.monotonic() + 1.0
+        deadline = time.monotonic() + 1.5
         while self._busy.is_set() and time.monotonic() < deadline:
-            time.sleep(_QUEUE_END_POLL_S)
+            time.sleep(_POLL_S)
         self._skip.clear()
 
     def wait(self, timeout: float = 120.0) -> None:
         """Block until everything queued has actually been spoken."""
         deadline = time.monotonic() + timeout
         while self.is_speaking and time.monotonic() < deadline:
-            time.sleep(_QUEUE_END_POLL_S)
+            time.sleep(_POLL_S)
 
     # --- worker -------------------------------------------------------------------
     def _ensure_worker(self) -> None:
@@ -129,49 +142,62 @@ class Speaker:
         while True:
             text = self._queue.get()
             self._busy.set()
-            started = time.monotonic()
-            # Minimum realistic duration: some drivers (macOS nsss) return from
-            # runAndWait early; without this floor the follow-up listener opens
-            # while JARVIS is still mid-sentence.
-            est = 0.2 + 60.0 * len(text.split()) / max(80, self.cfg.tts_rate)
             try:
                 if not self._skip.is_set():
-                    self._play(text)
+                    self._play(text)  # blocks until audio truly finishes
             except Exception as exc:
                 log.error("TTS failed: %s (replies stay text-only this session)", exc)
                 self._enabled = False
-            if not self._skip.is_set():
-                remaining = 0.9 * est - (time.monotonic() - started)
-                if remaining > 0:
-                    time.sleep(min(remaining, 30.0))
             self._queue.task_done()
             if self._queue.empty():
                 self._busy.clear()
                 self._finished_at = time.monotonic()
 
+    # --- playback backends --------------------------------------------------------
     def _play(self, text: str) -> None:
+        if self.cfg.speaker_device_index is not None and self._play_routed(text):
+            return
+        if self._say:
+            self._play_macos_say(text)
+        else:
+            self._play_pyttsx3(text)
+
+    def _play_macos_say(self, text: str) -> None:
+        """macOS `say` blocks until playback completes — no overlap."""
+        cmd = [self._say, "-r", str(self.cfg.tts_rate)]
+        name = self._say_voice_name()
+        if name:
+            cmd += ["-v", name]
+        cmd.append(text)
+        try:
+            self._proc = subprocess.Popen(cmd)
+            self._proc.wait()
+        except Exception as exc:
+            log.error("`say` failed (%s); falling back to pyttsx3", exc)
+            self._say = None  # stop trying it this session
+            self._play_pyttsx3(text)
+        finally:
+            self._proc = None
+
+    def _play_pyttsx3(self, text: str) -> None:
         import pyttsx3
 
-        engine = pyttsx3.init()  # fresh engine per item: reuse is flaky across threads
+        engine = pyttsx3.init()  # fresh per item: reuse is flaky across threads
         engine.setProperty("rate", self.cfg.tts_rate)
         if self.cfg.tts_voice:
             try:
                 engine.setProperty("voice", self.cfg.tts_voice)
             except Exception:
-                log.warning("Voice '%s' not found; using system default", self.cfg.tts_voice)
+                log.warning("Voice '%s' not found; using default", self.cfg.tts_voice)
         self._engine = engine
         try:
-            if self.cfg.speaker_device_index is not None:
-                if self._speak_routed(engine, text):
-                    return
-                log.warning("Routed playback failed; using system default speaker.")
             engine.say(text)
             engine.runAndWait()
         finally:
             self._engine = None
 
-    def _speak_routed(self, engine, text: str) -> bool:
-        """Render speech to a file and play it on the chosen output device."""
+    def _play_routed(self, text: str) -> bool:
+        """Render to a file and play on the chosen output device (sd.wait blocks)."""
         try:
             import sounddevice as sd
             import soundfile as sf
@@ -180,9 +206,26 @@ class Speaker:
             return False
         try:
             with tempfile.TemporaryDirectory() as tmp:
-                path = Path(tmp) / "tts.wav"  # macOS actually writes AIFF; soundfile
-                engine.save_to_file(text, str(path))  # detects format from content
-                engine.runAndWait()
+                path = Path(tmp) / "tts.wav"
+                if self._say:
+                    cmd = [self._say, "-r", str(self.cfg.tts_rate), "-o", str(path),
+                           "--data-format=LEF32@22050"]
+                    name = self._say_voice_name()
+                    if name:
+                        cmd += ["-v", name]
+                    cmd.append(text)
+                    subprocess.run(cmd, check=True)
+                else:
+                    import pyttsx3
+                    engine = pyttsx3.init()
+                    engine.setProperty("rate", self.cfg.tts_rate)
+                    if self.cfg.tts_voice:
+                        try:
+                            engine.setProperty("voice", self.cfg.tts_voice)
+                        except Exception:
+                            pass
+                    engine.save_to_file(text, str(path))
+                    engine.runAndWait()
                 if not path.exists() or path.stat().st_size == 0:
                     return False
                 data, rate = sf.read(str(path), dtype="float32")
@@ -190,6 +233,29 @@ class Speaker:
                 sd.wait()
             return True
         except Exception as exc:
-            log.error("Routed TTS playback failed on device %s: %s",
+            log.error("Routed playback failed on device %s: %s",
                       self.cfg.speaker_device_index, exc)
             return False
+
+    def _say_voice_name(self) -> str:
+        """Map the stored pyttsx3 voice id to a `say -v` name (e.g. 'Jamie')."""
+        raw = self.cfg.tts_voice
+        if not raw:
+            return ""
+        # If it already looks like a plain name, use it.
+        if "." not in raw:
+            return raw.split(" (")[0]
+        if self._voice_name_cache is None:
+            self._voice_name_cache = {}
+            try:
+                import pyttsx3
+                eng = pyttsx3.init()
+                for v in eng.getProperty("voices") or []:
+                    self._voice_name_cache[v.id] = (v.name or "").split(" (")[0]
+                try:
+                    eng.stop()
+                except Exception:
+                    pass
+            except Exception:
+                pass
+        return self._voice_name_cache.get(raw, "")
