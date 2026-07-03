@@ -35,10 +35,11 @@ Three ways, all equivalent — pick per moment:
 
 1. **Hands-free:** say **"jarvis"** (or "hey jarvis"), wait for the beep, then speak
    naturally: *"jarvis… what's on my desk?"*, *"jarvis… explain recursion simply"*.
-   After it answers, **just keep talking** — it listens for ~6 seconds after each reply
-   so you can go back and forth without repeating the wake word (say nothing to end the
-   conversation, or turn this off: Settings → Hands-free → Conversation mode). Your words
-   and its replies appear in the chat with a 🎤.
+   It starts speaking as soon as the first sentence of its reply is ready (no waiting for
+   the full answer). After it finishes, **just keep talking** — it listens for ~8 seconds
+   after each reply so you can go back and forth without repeating the wake word (say
+   nothing to end the conversation, or turn this off: Settings → Hands-free → Conversation
+   mode). Your words and its replies appear in the chat with a 🎤.
 2. **Typing:** just type in the chat box. Anything without a leading `/` is normal
    conversation.
 3. **Push-to-talk (terminal only):** type `/voice`, speak, press Enter.

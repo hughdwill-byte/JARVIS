@@ -322,15 +322,21 @@ class Assistant:
             return [a for a in self._activity if a["seq"] > seq]
 
     # --- main entry point --------------------------------------------------
-    def handle(self, user_text: str) -> Reply:
-        """Process one user input (typed or transcribed) and return the reply."""
+    def handle(self, user_text: str, on_sentence=None) -> Reply:
+        """Process one user input (typed or transcribed) and return the reply.
+
+        on_sentence: optional callback receiving reply sentences AS THEY ARE
+        GENERATED (used by the voice loop to start speaking immediately).
+        When it fires, the returned Reply has speak=False — it's already
+        being spoken.
+        """
         user_text = user_text.strip()
         if not user_text:
             return Reply("", speak=False)
         with self._handle_lock:  # voice thread and terminal/dashboard can't overlap
-            return self._handle_inner(user_text)
+            return self._handle_inner(user_text, on_sentence)
 
-    def _handle_inner(self, user_text: str) -> Reply:
+    def _handle_inner(self, user_text: str, on_sentence=None) -> Reply:
 
         command, args = self.router.route(user_text)
 
@@ -366,11 +372,23 @@ class Assistant:
         # (The in-chat tool loop needs the API backend; the claude_code-only
         # backend chats plainly here and handles actions via /agent.)
         speak_text = None
+        streamed = {"n": 0}
+        if on_sentence is not None:
+            inner_cb = on_sentence
+
+            def counting_cb(sentence: str) -> None:
+                streamed["n"] += 1
+                inner_cb(sentence)
+            stream_cb = counting_cb
+        else:
+            stream_cb = None
+
         if self.cfg.agent_enabled and self.llm.available and self.llm.raw is not None:
             agent = Agent(self.cfg, self.llm, AgentTools(self.cfg),
                           self.approval_callback, self.mcp)
             try:
-                final, actions = agent.run_conversation(user_text, history, context)
+                final, actions = agent.run_conversation(user_text, history, context,
+                                                        on_sentence=stream_cb)
             except Exception:
                 log.exception("Tool-capable chat failed; falling back to plain chat")
                 final, actions = self.llm.chat(user_text, history=history,
@@ -384,7 +402,8 @@ class Assistant:
 
         self.db.add_message("user", user_text)
         self.db.add_message("assistant", reply_text)
-        return Reply(reply_text, speak_text=speak_text)
+        # Already spoken live via the stream? Then don't speak it again.
+        return Reply(reply_text, speak=streamed["n"] == 0, speak_text=speak_text)
 
     def close(self) -> None:
         if self.voice_loop is not None:

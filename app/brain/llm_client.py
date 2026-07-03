@@ -20,8 +20,10 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
+from typing import Callable
 
 from app.config import Config
 from app.logger import get_logger
@@ -41,6 +43,31 @@ _HARD_HINTS = (
     "essay feedback", "review my draft", "explain in depth", "research plan",
 )
 _HARD_LENGTH = 600  # chars — long pasted content usually means a real task
+
+
+_SENTENCE_END = re.compile(r"(?<=[.!?])[\s\n]+")
+
+
+class SentenceStreamer:
+    """Feeds streamed text deltas out as complete sentences (for live TTS)."""
+
+    def __init__(self, emit: Callable[[str], None]):
+        self.emit = emit
+        self._buf = ""
+
+    def feed(self, delta: str) -> None:
+        self._buf += delta
+        parts = _SENTENCE_END.split(self._buf)
+        if len(parts) > 1:
+            for sentence in parts[:-1]:
+                if sentence.strip():
+                    self.emit(sentence.strip())
+            self._buf = parts[-1]
+
+    def flush(self) -> None:
+        if self._buf.strip():
+            self.emit(self._buf.strip())
+        self._buf = ""
 
 
 def cached_system(static: str, dynamic: str = "") -> list[dict]:

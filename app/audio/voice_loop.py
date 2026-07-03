@@ -38,9 +38,9 @@ except ImportError:
     np = None
 
 SAMPLE_RATE = 16000          # required by both openwakeword and whisper
-SPEECH_RMS = 0.010           # rough voice-activity threshold (float32 scale)
+SPEECH_RMS = 0.006           # voice-activity threshold (lower = hears quieter mics)
 START_TIMEOUT_S = 6.0        # give up if you say "jarvis" then nothing
-FOLLOW_UP_WINDOW_S = 6.0     # reply window after JARVIS speaks (no wake word needed)
+FOLLOW_UP_WINDOW_S = 8.0     # reply window after JARVIS speaks (no wake word needed)
 MAX_UTTERANCE_S = 15.0
 END_SILENCE_S = 1.2          # stop recording after this much quiet
 MIN_VOICED_S = 0.25          # ignore blips shorter than this (coughs, keyboard, door)
@@ -226,10 +226,20 @@ class VoiceLoop(threading.Thread):
             self.assistant.record_activity("assistant", "Microphone off. Type anything to re-enable.")
             self.assistant.speaker.speak("Going quiet. Type anything when you need me.")
             return False
-        reply = self.assistant.handle(text)
+        # Stream: speak each sentence the moment it's generated instead of
+        # waiting for the whole reply to finish.
+        streamed = {"n": 0}
+
+        def speak_sentence(sentence: str) -> None:
+            streamed["n"] += 1
+            self.assistant.speaker.enqueue(sentence)
+
+        reply = self.assistant.handle(text, on_sentence=speak_sentence)
         if reply.text:
             print(f"\njarvis> {reply.text}\n")
             self.assistant.record_activity("assistant", reply.text)
+            if streamed["n"] > 0:
+                return True  # already speaking — started mid-generation
             if reply.speak:
                 self.assistant.speaker.speak(reply.spoken)
                 return True

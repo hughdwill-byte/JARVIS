@@ -24,7 +24,12 @@ import webbrowser
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
-from app.brain.llm_client import LLMClient, cached_system, web_search_tool
+from app.brain.llm_client import (
+    LLMClient,
+    SentenceStreamer,
+    cached_system,
+    web_search_tool,
+)
 from app.config import Config
 from app.logger import get_logger
 from app.prompts import (
@@ -223,6 +228,7 @@ class Agent:
         history: list[dict] | None = None,
         context_block: str = "",
         on_action: Callable[[str], None] = print,
+        on_sentence: Callable[[str], None] | None = None,
     ) -> tuple[str, list[str]]:
         """Normal chat with tools available: JARVIS acts only when the request
         needs the computer/apps, otherwise it just answers. Returns (reply, actions)."""
@@ -232,10 +238,12 @@ class Agent:
         system = cached_system(SYSTEM_PROMPT + "\n\n" + CHAT_TOOLS_ADDENDUM, dynamic)
         messages = list(history or []) + [{"role": "user", "content": user_text}]
         # Cheap model for the first look; escalates to the smart model once it acts.
-        return self._loop(messages, system, self.llm.pick_model(user_text), on_action)
+        return self._loop(messages, system, self.llm.pick_model(user_text), on_action,
+                          on_sentence)
 
     def _loop(self, messages: list[dict], system: list[dict], model: str,
-              on_action: Callable[[str], None]) -> tuple[str, list[str]]:
+              on_action: Callable[[str], None],
+              on_sentence: Callable[[str], None] | None = None) -> tuple[str, list[str]]:
         schemas = list(LOCAL_TOOL_SCHEMAS)
         search = web_search_tool(self.cfg)
         if search is not None:
@@ -245,15 +253,28 @@ class Agent:
         client = self.llm.raw
         actions: list[str] = []
 
+        can_stream = on_sentence is not None and hasattr(client.messages, "stream")
         for _step in range(self.cfg.agent_max_steps):
             try:
-                resp = client.messages.create(
-                    model=model,
-                    max_tokens=2048,
-                    system=system,
-                    tools=schemas,
-                    messages=messages,
-                )
+                if can_stream:
+                    # Stream so speech can start on the FIRST sentence, not the last.
+                    streamer = SentenceStreamer(on_sentence)
+                    with client.messages.stream(
+                        model=model, max_tokens=2048, system=system,
+                        tools=schemas, messages=messages,
+                    ) as stream:
+                        for delta in stream.text_stream:
+                            streamer.feed(delta)
+                        resp = stream.get_final_message()
+                    streamer.flush()
+                else:
+                    resp = client.messages.create(
+                        model=model,
+                        max_tokens=2048,
+                        system=system,
+                        tools=schemas,
+                        messages=messages,
+                    )
             except Exception as exc:
                 log.error("Agent LLM call failed: %s", exc)
                 return self.llm._explain_error(exc), actions

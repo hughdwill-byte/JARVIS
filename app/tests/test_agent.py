@@ -211,6 +211,62 @@ def test_web_search_tool_offered_when_enabled(agent_cfg):
     assert "web_search" not in [t.get("name") for t in client2.calls[0]["tools"]]
 
 
+def test_sentence_streamer_emits_complete_sentences():
+    from app.brain.llm_client import SentenceStreamer
+    got = []
+    s = SentenceStreamer(got.append)
+    s.feed("Your desk has a lap")
+    s.feed("top. Also a mug! And fin")
+    assert got == ["Your desk has a laptop.", "Also a mug!"]
+    s.feed("ally pens")
+    s.flush()
+    assert got[-1] == "And finally pens"
+
+
+class FakeStreamingClient:
+    """Anthropic-like client whose messages.stream yields text then a final message."""
+
+    def __init__(self, text, final):
+        self._text, self._final = text, final
+        self.messages = self
+        self.stream_calls = 0
+
+    def stream(self, **kwargs):
+        self.stream_calls += 1
+        outer = self
+
+        class _Ctx:
+            def __enter__(ctx):
+                return ctx
+
+            def __exit__(ctx, *a):
+                return False
+
+            @property
+            def text_stream(ctx):
+                for i in range(0, len(outer._text), 7):  # ragged chunks
+                    yield outer._text[i:i + 7]
+
+            def get_final_message(ctx):
+                return outer._final
+
+        return _Ctx()
+
+
+def test_conversation_streams_sentences_to_callback(agent_cfg):
+    cfg, _ws = agent_cfg
+    text = "The score was two one. City won at the death."
+    final = SimpleNamespace(content=[_text(text)], stop_reason="end_turn")
+    llm = LLMClient(cfg)
+    llm._client = FakeStreamingClient(text, final)
+    agent = Agent(cfg, llm, AgentTools(cfg), lambda n, d: True)
+    heard = []
+    reply, actions = agent.run_conversation("score?", on_sentence=heard.append)
+    assert heard == ["The score was two one.", "City won at the death."]
+    assert reply == text  # full reply still returned for the chat log
+    assert llm._client.stream_calls == 1
+
+
 def test_pause_turn_continues_loop(agent_cfg):
     cfg, _ws = agent_cfg
     paused = SimpleNamespace(content=[_text("searching…")], stop_reason="pause_turn")
