@@ -19,7 +19,8 @@ without restarting the process.
 
 ## Voice data flow
 
-```mermaid
+```
+mermaid
 sequenceDiagram
     participant U as You
     participant M as Mic (sounddevice)
