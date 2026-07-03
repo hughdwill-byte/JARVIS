@@ -90,9 +90,13 @@ SETTINGS_SCHEMA: list[dict] = [
                      "('alexa', 'hey mycroft', 'hey rhasspy'). Fully custom phrases would "
                      "need training a detection model (openwakeword docs) — not built in."},
             {"key": "FOLLOW_UP_LISTEN", "label": "Conversation mode", "type": "toggle",
-             "help": "After JARVIS answers, it keeps listening ~6 seconds so you can reply "
+             "help": "After JARVIS answers, it keeps listening ~8 seconds so you can reply "
                      "without saying the wake phrase again. Stay quiet to end the "
                      "conversation."},
+            {"key": "BARGE_IN", "label": "Interrupt by talking", "type": "toggle",
+             "help": "Talk over JARVIS (clearly, for half a second) and it stops and "
+                     "listens to you instead. Turn off if loud speakers make it "
+                     "self-interrupt."},
         ],
     },
     {

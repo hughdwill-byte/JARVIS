@@ -27,12 +27,18 @@ def first_run_check(assistant: Assistant) -> int:
     """Verify each subsystem and print a fix hint for anything missing."""
     print("Running first-run check...\n")
     print(assistant.status_text())
-    print("\nMemory test:", assistant.notes.add("first-run check note"))
-    rows = assistant.db.list_notes(1)
-    ok = bool(rows) and "first-run check" in rows[0]["content"]
-    if rows:
-        assistant.db.delete_note(rows[0]["id"])
-    print("Memory read-back:", "OK" if ok else "FAILED — check DATABASE_PATH permissions")
+    try:
+        print("\nMemory test:", assistant.notes.add("first-run check note"))
+        rows = assistant.db.list_notes(1)
+        ok = bool(rows) and "first-run check" in rows[0]["content"]
+        if rows:
+            assistant.db.delete_note(rows[0]["id"])
+        print("Memory read-back:", "OK" if ok else "FAILED — check DATABASE_PATH permissions")
+    except Exception as exc:
+        ok = False
+        print(f"Memory test FAILED: {exc}\n"
+              "Fix: check that the data/ folder is writable (permissions/disk), or set "
+              "DATABASE_PATH in .env to a writable location.")
     if assistant.llm.available:
         print("\nLLM test:", assistant.llm.chat("Reply with exactly: systems online.", max_tokens=20))
     else:
@@ -80,7 +86,8 @@ def main() -> int:
         while True:
             for msg in assistant.due_reminder_messages():
                 print(f"\n  REMINDER: {msg}")
-                assistant.speaker.speak(f"Reminder: {msg}")
+                # enqueue, not speak: never cut off an in-flight spoken reply
+                assistant.speaker.enqueue(f"Reminder: {msg}")
             try:
                 user_text = input("you> ").strip()
             except EOFError:

@@ -73,6 +73,8 @@ class Config:
     # After JARVIS answers, keep listening briefly so you can reply without
     # saying the wake word again.
     follow_up_listen: bool = True
+    # Interrupt JARVIS by talking over it (sustained speech cuts it off).
+    barge_in: bool = True
 
     # TTS
     tts_provider: str = "pyttsx3"
@@ -162,6 +164,7 @@ def load_config(env_file: str | os.PathLike | None = None) -> Config:
         wake_word_model=os.getenv("WAKE_WORD_MODEL", "hey_jarvis").strip(),
         wake_word_threshold=_float(os.getenv("WAKE_WORD_THRESHOLD"), 0.5),
         follow_up_listen=_bool(os.getenv("FOLLOW_UP_LISTEN"), True),
+        barge_in=_bool(os.getenv("BARGE_IN"), True),
         tts_provider=os.getenv("TTS_PROVIDER", "pyttsx3").strip().lower(),
         tts_rate=_int(os.getenv("TTS_RATE"), 180),
         tts_voice=os.getenv("TTS_VOICE", "").strip(),

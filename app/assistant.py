@@ -333,6 +333,11 @@ class Assistant:
         user_text = user_text.strip()
         if not user_text:
             return Reply("", speak=False)
+        # /stop (or "stop talking") is an interrupt: it must preempt an
+        # in-flight turn, so it acts on the speaker directly, without the lock.
+        if self.router.route(user_text)[0] == "stop":
+            self.speaker.stop()
+            return Reply("Stopped.", speak=False)
         with self._handle_lock:  # voice thread and terminal/dashboard can't overlap
             return self._handle_inner(user_text, on_sentence)
 

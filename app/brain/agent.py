@@ -18,6 +18,7 @@ Safety model:
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 import webbrowser
@@ -47,6 +48,19 @@ log = get_logger("agent")
 READ_CAP = 50_000        # chars of a file shown to the model
 OUTPUT_CAP = 8_000       # chars of command output / tool result
 COMMAND_TIMEOUT_S = 90
+
+# Hard backstop, independent of the model's judgment AND of auto-approve:
+# catastrophic commands are refused outright.
+_DESTRUCTIVE_PATTERNS = (
+    r"\brm\s+-[a-zA-Z]*[rf][a-zA-Z]*\s+(?:/|~|\$HOME)\s*(?:/\*|\*)?\s*$",  # rm -rf on / or ~
+    r"\bmkfs\b",
+    r"\bdiskutil\s+erase",
+    r"\bdd\s+if=",
+    r":\(\)\s*\{",                       # fork bomb
+    r"\b(shutdown|reboot|halt)\b",
+    r">\s*/dev/(?:sd|disk|nvme)",
+)
+_DESTRUCTIVE_RE = [re.compile(p, re.I) for p in _DESTRUCTIVE_PATTERNS]
 
 LOCAL_TOOL_SCHEMAS = [
     {"name": "list_dir",
@@ -148,6 +162,12 @@ class AgentTools:
         return f"Wrote {len(content):,} chars to {target}"
 
     def run_command(self, command: str) -> str:
+        if any(rx.search(command) for rx in _DESTRUCTIVE_RE):
+            raise ToolError(
+                "That command matches the destructive-commands blocklist "
+                "(recursive delete of home/root, disk operations, shutdown). "
+                "Refused — even with auto-approve on."
+            )
         try:
             proc = subprocess.run(
                 command, shell=True, capture_output=True, text=True,
@@ -244,12 +264,17 @@ class Agent:
     def _loop(self, messages: list[dict], system: list[dict], model: str,
               on_action: Callable[[str], None],
               on_sentence: Callable[[str], None] | None = None) -> tuple[str, list[str]]:
-        schemas = list(LOCAL_TOOL_SCHEMAS)
+        schemas: list[dict] = []
         search = web_search_tool(self.cfg)
         if search is not None:
             schemas.append(search)  # server-side: the API runs searches itself
+        schemas += LOCAL_TOOL_SCHEMAS
         if self.mcp is not None:
             schemas += self.mcp.tool_schemas()
+        # Cache breakpoint on the LAST tool: the whole tools block (~2.6k tokens,
+        # resent on every turn) then caches — this clears Haiku's 2,048-token
+        # caching minimum even though the system prefix alone doesn't.
+        schemas[-1] = {**schemas[-1], "cache_control": {"type": "ephemeral"}}
         client = self.llm.raw
         actions: list[str] = []
 

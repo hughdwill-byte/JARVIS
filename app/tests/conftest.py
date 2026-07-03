@@ -15,6 +15,9 @@ def cfg(tmp_path):
         stt_provider="none",
         tts_provider="none",
         database_path=tmp_path / "test.db",
+        # Isolate from the developer's real mcp_servers.json — tests must not
+        # depend on local filesystem state.
+        mcp_config_path=tmp_path / "mcp_servers.json",
     )
 
 

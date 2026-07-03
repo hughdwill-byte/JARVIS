@@ -45,6 +45,9 @@ MAX_UTTERANCE_S = 15.0
 END_SILENCE_S = 1.2          # stop recording after this much quiet
 MIN_VOICED_S = 0.25          # ignore blips shorter than this (coughs, keyboard, door)
 TTS_COOLDOWN_S = 0.8         # ignore the mic briefly after JARVIS speaks (room echo tail)
+BARGE_RMS = 0.02             # louder-than-playback level that counts as talking over it
+BARGE_SUSTAIN_S = 0.4        # sustained speech needed to interrupt (not a cough)
+REMINDER_POLL_S = 5.0        # how often the idle loop checks for due reminders
 
 # Whisper invents these from noise/near-silence. If a follow-up "reply" is just
 # one of these, treat it as no reply at all — stay silent.
@@ -59,6 +62,15 @@ def is_noise_transcript(text: str) -> bool:
     return len(cleaned) <= 1 or cleaned in _NOISE_TRANSCRIPTS
 
 
+# Common filler words carry no evidence about WHO spoke; judging echo on them
+# made real follow-ups like "do that now" vanish.
+_STOPWORDS = frozenset(
+    "the a an and or to of in on for you your i it that this is are do now too "
+    "with my me at be was so just can will would have has had not no yes okay ok "
+    "please what about how we they them his her its as by from".split()
+)
+
+
 def looks_like_echo(transcript: str, last_spoken: str) -> bool:
     """True if the mic mostly heard JARVIS's own words (speaker bleed/echo)."""
     if not last_spoken or not transcript:
@@ -69,22 +81,25 @@ def looks_like_echo(transcript: str, last_spoken: str) -> bool:
         return False
     if len(t) > 12 and t in s:
         return True  # a contiguous chunk of what it just said
-    t_words = t.split()
-    if len(t_words) < 3:
-        return False  # too short to judge — let terse real replies through
-    overlap = len(set(t_words) & set(s.split())) / len(set(t_words))
-    return overlap >= 0.8
+    # Word-overlap check on CONTENT words only — stop-words prove nothing.
+    t_content = {w for w in t.split() if w not in _STOPWORDS}
+    if len(t_content) < 2:
+        return False  # too little evidence — let it through rather than eat it
+    s_content = {w for w in s.split() if w not in _STOPWORDS}
+    return len(t_content & s_content) / len(t_content) >= 0.9
 
 # Say any of these (as a short utterance) to close the mic completely.
 SLEEP_PHRASES = ("shutdown", "shut down", "stop listening", "go to sleep", "power down")
 
 
 def is_sleep_phrase(text: str) -> bool:
-    """True if a SHORT utterance is a sleep command ('Shutdown.', 'go to sleep')."""
+    """True only if the WHOLE utterance is a sleep command ('Shutdown.').
+
+    Exact match on purpose: 'shut down the server' or 'stop listening to
+    spotify' are tasks, not requests to close the microphone.
+    """
     cleaned = re.sub(r"[^a-z ]", "", text.lower()).strip()
-    if not cleaned or len(cleaned.split()) > 4:
-        return False  # long sentences that merely contain 'shutdown' don't count
-    return any(p in cleaned for p in SLEEP_PHRASES)
+    return cleaned in SLEEP_PHRASES
 
 
 class VoiceLoop(threading.Thread):
@@ -173,12 +188,37 @@ class VoiceLoop(threading.Thread):
         ) as stream:
             print("\n  [MIC ACTIVE — waiting for 'jarvis'; say 'shutdown' to stop]")
             self.detector.reset()
+            chunk_s = CHUNK_SAMPLES / SAMPLE_RATE
+            barge_run = 0.0
+            last_reminder_check = 0.0
             while not self._stop and self._listen.is_set():
                 chunk, _overflowed = stream.read(CHUNK_SAMPLES)
                 if (self.assistant.speaker.is_speaking
                         or self.assistant.speaker.seconds_since_speech < TTS_COOLDOWN_S):
                     self.detector.reset()  # own voice / echo tail can't wake it
+                    # Barge-in: sustained loud speech over the top interrupts it.
+                    if self.cfg.barge_in and self.assistant.speaker.is_speaking:
+                        rms = float(np.sqrt(np.mean(
+                            (chunk[:, 0].astype(np.float32) / 32768.0) ** 2)))
+                        barge_run = barge_run + chunk_s if rms >= BARGE_RMS else 0.0
+                        if barge_run >= BARGE_SUSTAIN_S:
+                            barge_run = 0.0
+                            print("\n  [interrupted — go ahead]")
+                            self.assistant.speaker.stop()
+                            self._drain(stream)
+                            self._conversation(stream, first_timeout=5.0)
+                            self._drain(stream)
+                            self.detector.reset()
                     continue
+                barge_run = 0.0
+                # Proactive: speak due reminders while idle (film-JARVIS volunteers).
+                now = time.monotonic()
+                if now - last_reminder_check >= REMINDER_POLL_S:
+                    last_reminder_check = now
+                    for msg in self.assistant.due_reminder_messages():
+                        print(f"\n  REMINDER: {msg}")
+                        self.assistant.record_activity("assistant", f"Reminder: {msg}")
+                        self.assistant.speaker.enqueue(f"Reminder: {msg}")
                 if self.detector.process(chunk[:, 0]):
                     self._handle_wake(stream)
                     self._drain(stream)
@@ -188,7 +228,10 @@ class VoiceLoop(threading.Thread):
     def _handle_wake(self, stream) -> None:
         print("\n  [JARVIS] Yes? (listening...)")
         self._chime()
-        spoke = self._one_exchange(stream, START_TIMEOUT_S, first=True)
+        self._conversation(stream)
+
+    def _conversation(self, stream, first_timeout: float = START_TIMEOUT_S) -> None:
+        spoke = self._one_exchange(stream, first_timeout, first=True)
         # Conversation mode: after each spoken reply, keep listening briefly so
         # the user can respond without saying the wake word again.
         while (spoke and self.cfg.follow_up_listen

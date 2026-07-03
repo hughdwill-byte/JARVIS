@@ -58,6 +58,20 @@ def test_write_and_relative_paths_resolve_to_workspace(agent_cfg):
     assert (ws / "sub" / "new.txt").read_text() == "hello"
 
 
+def test_run_command_blocks_destructive_commands(agent_cfg):
+    """Backstop independent of model judgment AND auto-approve."""
+    cfg, _ws = agent_cfg
+    tools = AgentTools(cfg)
+    for cmd in ("rm -rf /", "rm -rf ~", "sudo rm -fr /", "mkfs.ext4 /dev/sda1",
+                "diskutil eraseDisk free X disk0", "dd if=/dev/zero of=/dev/sda",
+                "shutdown -h now", "reboot", "echo x > /dev/sda"):
+        with pytest.raises(ToolError, match="blocklist"):
+            tools.run_command(cmd)
+    # ordinary commands — including a scoped recursive delete — still run
+    out = tools.run_command("mkdir -p build && rm -rf build && echo cleaned")
+    assert "cleaned" in out and "[exit 0]" in out
+
+
 def test_run_command_executes_in_workspace(agent_cfg):
     cfg, ws = agent_cfg
     (ws / "a.txt").write_text("x")
@@ -202,6 +216,12 @@ def test_web_search_tool_offered_when_enabled(agent_cfg):
     agent.run_conversation("who won this morning?")
     names = [t.get("name") for t in client.calls[0]["tools"]]
     assert "web_search" in names
+    # playtest #1: the LAST tool carries the cache breakpoint so the whole
+    # tools block caches (clears Haiku's 2,048-token caching minimum)
+    tools = client.calls[0]["tools"]
+    assert tools[-1]["cache_control"] == {"type": "ephemeral"}
+    assert "input_schema" in tools[-1]  # breakpoint on a client tool, not the server tool
+    assert sum(1 for t in tools if "cache_control" in t) == 1
 
     cfg.web_search_enabled = False
     agent2, client2 = _agent_with(cfg, [
@@ -293,6 +313,21 @@ def test_agent_command_offline_and_disabled(cfg):
         bot.cfg.agent_enabled = False
         assert "turned off" in bot.handle("/agent do something").text
         assert "No apps configured" in bot.handle("/apps").text
+    finally:
+        bot.close()
+
+
+def test_stop_preempts_without_the_lock(cfg):
+    """Playtest #3: /stop must interrupt an in-flight turn, not queue behind it."""
+    bot = Assistant(cfg)
+    try:
+        bot._handle_lock.acquire()  # simulate a turn in flight
+        try:
+            reply = bot.handle("/stop")          # must NOT deadlock
+            assert reply.text == "Stopped."
+            assert bot.handle("stop talking").text == "Stopped."  # phrase route too
+        finally:
+            bot._handle_lock.release()
     finally:
         bot.close()
 

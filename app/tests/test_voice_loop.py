@@ -33,6 +33,26 @@ def test_sleep_phrases_ignore_normal_speech():
     assert not is_sleep_phrase("how do I shutdown a linux server safely")
 
 
+def test_sleep_phrase_requires_whole_utterance():
+    """Playtest regression: 4-word TASKS must not close the microphone."""
+    assert not is_sleep_phrase("shut down the server")
+    assert not is_sleep_phrase("stop listening to spotify")
+    assert not is_sleep_phrase("power down the pi")
+    # ...while the real commands still work
+    assert is_sleep_phrase("power down")
+    assert is_sleep_phrase("Shut down!")
+
+
+def test_echo_filter_ignores_stopwords():
+    """Playtest regression: follow-ups built from common words must get through."""
+    spoken = "I'll add milk and bread to your list for you now."
+    assert not looks_like_echo("do that now", spoken)
+    assert not looks_like_echo("for you now", spoken)
+    assert not looks_like_echo("add eggs and bread too", spoken)
+    # genuine echo (content words all from the spoken reply) is still caught
+    assert looks_like_echo("add milk bread list", spoken)
+
+
 def test_self_echo_is_disregarded():
     spoken = "Your desk has a laptop, a blue notebook, and two pens on the left."
     # mic picks up (part of) its own sentence -> discard

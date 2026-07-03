@@ -18,14 +18,17 @@ log = get_logger("stt")
 class Transcriber:
     """Lazy-loads the Whisper model on first use (download can take a minute)."""
 
+    MAX_CONSECUTIVE_FAILURES = 3  # transient errors retry; only give up after a streak
+
     def __init__(self, cfg: Config):
         self.cfg = cfg
         self._model = None
-        self._failed = False
+        self._fail_count = 0
 
     @property
     def available(self) -> bool:
-        if self.cfg.stt_provider != "local_whisper" or self._failed or np is None:
+        if (self.cfg.stt_provider != "local_whisper" or np is None
+                or self._fail_count >= self.MAX_CONSECUTIVE_FAILURES):
             return False
         try:
             import faster_whisper  # noqa: F401
@@ -61,10 +64,12 @@ class Transcriber:
                     audio,
                 ).astype(np.float32)
             segments, _info = model.transcribe(audio, beam_size=1, language="en")
+            self._fail_count = 0
             return " ".join(s.text.strip() for s in segments).strip()
         except Exception as exc:
-            log.error("Transcription failed: %s", exc)
-            self._failed = True
+            self._fail_count += 1
+            log.error("Transcription failed (%d/%d): %s — will retry",
+                      self._fail_count, self.MAX_CONSECUTIVE_FAILURES, exc)
             return ""
 
     def transcribe_file(self, path: str | Path) -> str:
@@ -72,7 +77,10 @@ class Transcriber:
             return ""
         try:
             segments, _info = self._load().transcribe(str(path), beam_size=1)
+            self._fail_count = 0
             return " ".join(s.text.strip() for s in segments).strip()
         except Exception as exc:
-            log.error("Transcription failed: %s", exc)
+            self._fail_count += 1
+            log.error("Transcription failed (%d/%d): %s — will retry",
+                      self._fail_count, self.MAX_CONSECUTIVE_FAILURES, exc)
             return ""
