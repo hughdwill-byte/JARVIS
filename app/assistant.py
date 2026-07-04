@@ -17,7 +17,7 @@ from app.audio.voice_loop import VoiceLoop
 from app.brain.agent import Agent, AgentTools
 from app.brain.llm_client import create_llm_client
 from app.brain.mcp_client import MCPManager
-from app.brain.router import Router
+from app.brain.router import Router, looks_like_computer_task
 from app.brain.tool_manager import ToolManager
 from app.config import Config
 from app.logger import get_logger, setup_logging
@@ -402,6 +402,13 @@ class Assistant:
             if actions:
                 reply_text += "\n\nActions taken:\n" + "\n".join(f"  - {a}" for a in actions)
                 speak_text = final  # don't read the action log aloud
+        elif (self.cfg.agent_enabled and self.llm.available
+              and getattr(self.llm, "agent_task", None) is not None
+              and looks_like_computer_task(user_text)):
+            # claude_code backend: plain chat has no tools, so requests that
+            # clearly need the computer/apps go to agent mode automatically —
+            # same as typing /agent, without having to know the command.
+            reply_text = self._cmd_agent(user_text)
         else:
             reply_text = self.llm.chat(user_text, history=history, context_block=context)
 

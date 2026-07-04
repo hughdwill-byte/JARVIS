@@ -44,6 +44,18 @@ _HARD_HINTS = (
 )
 _HARD_LENGTH = 600  # chars — long pasted content usually means a real task
 
+# Phrases that summon the DEEP (premium, e.g. Opus) model. Kept narrow on
+# purpose: it's the priciest tier, so it only runs when clearly asked for —
+# either by naming the kind of output ("in-depth report", "deep dive") or by
+# asking outright ("use opus"). Ordinary chat never lands here.
+_DEEP_HINTS = (
+    "in-depth", "in depth", "deep dive", "comprehensive",
+    "thorough analysis", "thorough report", "detailed report", "full report",
+    "use opus", "your best model", "the big model",
+)
+# Deep work usually means long output; 1024 tokens would truncate a report.
+DEEP_MAX_TOKENS = 8192
+
 
 _SENTENCE_END = re.compile(r"(?<=[.!?])[\s\n]+")
 
@@ -103,13 +115,29 @@ def web_search_tool(cfg: Config) -> dict | None:
 
 
 def _pick_model(cfg: Config, user_text: str, force_smart: bool = False) -> str:
-    """Shared routing heuristics for every backend."""
+    """Shared routing heuristics for every backend.
+
+    Three tiers, cheapest wins unless the request earns an upgrade:
+      fast (default) -> smart (hard/long/forced) -> deep (explicitly summoned).
+    Deep is checked first so "/agent write an in-depth report" upgrades past
+    the forced-smart tier.
+    """
+    lowered = user_text.lower()
+    if any(h in lowered for h in _DEEP_HINTS):
+        return cfg.llm_model_deep
     if force_smart:
         return cfg.llm_model_smart
-    lowered = user_text.lower()
     if len(user_text) > _HARD_LENGTH or any(h in lowered for h in _HARD_HINTS):
         return cfg.llm_model_smart
     return cfg.llm_model_fast
+
+
+def max_tokens_for(cfg: Config, model: str, requested: int | None = None) -> int:
+    """Reply-length cap for a model: deep work gets room to write a real report."""
+    base = requested or cfg.llm_max_tokens
+    if model == cfg.llm_model_deep:
+        return max(base, DEEP_MAX_TOKENS)
+    return base
 
 
 class LLMClient:
@@ -136,7 +164,8 @@ class LLMClient:
         return self._client
 
     def describe(self) -> str:
-        base = f"Claude API ({self.cfg.llm_model_fast} / {self.cfg.llm_model_smart})"
+        base = (f"Claude API ({self.cfg.llm_model_fast} / {self.cfg.llm_model_smart}; "
+                f"{self.cfg.llm_model_deep} on demand)")
         return base if self.available else base + " — set the API key in Settings"
 
     def pick_model(self, user_text: str, force_smart: bool = False) -> str:
@@ -167,7 +196,7 @@ class LLMClient:
         try:
             resp = self._client.messages.create(
                 model=model,
-                max_tokens=max_tokens or self.cfg.llm_max_tokens,
+                max_tokens=max_tokens_for(self.cfg, model, max_tokens),
                 system=system,
                 messages=messages,
                 **({"tools": [search]} if search else {}),
@@ -359,7 +388,10 @@ class ClaudeCodeClient:
                       "enable 'Act without asking' in Settings -> Computer & Apps "
                       "(or switch Brain source to 'anthropic'/'hybrid' for per-action "
                       "approval prompts).")
-        return self._run(task, system, self.cfg.llm_model_smart, allowed_tools=allowed,
+        # force_smart floor, but a deep-hinted task ("in-depth report") gets the
+        # deep model — free here anyway, it's billed to the subscription.
+        model = self.pick_model(task, force_smart=True)
+        return self._run(task, system, model, allowed_tools=allowed,
                          permission_mode=mode, cwd=workdir, timeout=_CC_TASK_TIMEOUT_S)
 
     _explain_error = LLMClient._explain_error
@@ -393,8 +425,11 @@ class HybridClient:
     def chat(self, user_text: str, history: list[dict] | None = None,
              context_block: str = "", force_smart: bool = False,
              max_tokens: int | None = None) -> str:
-        if force_smart and self.cc.available:  # big task -> free on the subscription
-            return self.cc.chat(user_text, history, context_block, True, max_tokens)
+        # Big tasks -> free on the subscription. That includes deep-hinted
+        # requests ("in-depth report"): Opus on the Pro plan costs $0 extra.
+        wants_deep = self.pick_model(user_text, force_smart) == self.cfg.llm_model_deep
+        if (force_smart or wants_deep) and self.cc.available:
+            return self.cc.chat(user_text, history, context_block, force_smart, max_tokens)
         target = self.api if self.api.available else self.cc
         return target.chat(user_text, history=history, context_block=context_block,
                            force_smart=force_smart, max_tokens=max_tokens)

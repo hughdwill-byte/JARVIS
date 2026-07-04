@@ -29,6 +29,7 @@ from app.brain.llm_client import (
     LLMClient,
     SentenceStreamer,
     cached_system,
+    max_tokens_for,
     web_search_tool,
 )
 from app.config import Config
@@ -237,7 +238,9 @@ class Agent:
         final, actions = self._loop(
             messages=[{"role": "user", "content": task}],
             system=cached_system(AGENT_SYSTEM_PROMPT, current_datetime_line()),
-            model=self.cfg.llm_model_smart,
+            # Smart model floor; a deep-hinted task ("in-depth report") gets
+            # the deep model instead.
+            model=self.llm.pick_model(task, force_smart=True),
             on_action=on_action,
         )
         return self._with_action_log(final, actions)
@@ -280,12 +283,14 @@ class Agent:
 
         can_stream = on_sentence is not None and hasattr(client.messages, "stream")
         for _step in range(self.cfg.agent_max_steps):
+            # Deep work (reports) needs room to write; everyday steps stay capped.
+            max_tokens = max_tokens_for(self.cfg, model, 2048)
             try:
                 if can_stream:
                     # Stream so speech can start on the FIRST sentence, not the last.
                     streamer = SentenceStreamer(on_sentence)
                     with client.messages.stream(
-                        model=model, max_tokens=2048, system=system,
+                        model=model, max_tokens=max_tokens, system=system,
                         tools=schemas, messages=messages,
                     ) as stream:
                         for delta in stream.text_stream:
@@ -295,7 +300,7 @@ class Agent:
                 else:
                     resp = client.messages.create(
                         model=model,
-                        max_tokens=2048,
+                        max_tokens=max_tokens,
                         system=system,
                         tools=schemas,
                         messages=messages,
@@ -315,7 +320,9 @@ class Agent:
                 final = "".join(b.text for b in resp.content if b.type == "text").strip()
                 return final, actions
 
-            model = self.cfg.llm_model_smart  # multi-step work deserves the smart model
+            if model == self.cfg.llm_model_fast:
+                model = self.cfg.llm_model_smart  # multi-step work deserves the smart
+                # model — but never downgrade a run that started on the deep model
             messages.append({"role": "assistant", "content": resp.content})
             results = []
             for block in tool_uses:

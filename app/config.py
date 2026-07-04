@@ -52,6 +52,9 @@ class Config:
     anthropic_api_key: str = ""
     llm_model_fast: str = "claude-haiku-4-5"
     llm_model_smart: str = "claude-sonnet-5"
+    # Premium tier: only used when the user explicitly asks for heavy work
+    # ("in-depth report", "deep dive", "use opus") — never on ordinary chat.
+    llm_model_deep: str = "claude-opus-4-8"
     llm_max_tokens: int = 1024
 
     # Vision
@@ -151,6 +154,7 @@ def load_config(env_file: str | os.PathLike | None = None) -> Config:
         anthropic_api_key=os.getenv("ANTHROPIC_API_KEY", "").strip(),
         llm_model_fast=os.getenv("LLM_MODEL_FAST", "claude-haiku-4-5").strip(),
         llm_model_smart=os.getenv("LLM_MODEL_SMART", "claude-sonnet-5").strip(),
+        llm_model_deep=os.getenv("LLM_MODEL_DEEP", "claude-opus-4-8").strip(),
         llm_max_tokens=_int(os.getenv("LLM_MAX_TOKENS"), 1024),
         vision_provider=os.getenv("VISION_PROVIDER", "anthropic").strip().lower(),
         camera_index=_int(os.getenv("CAMERA_INDEX"), 0),

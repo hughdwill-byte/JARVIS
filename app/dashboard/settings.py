@@ -47,6 +47,12 @@ SETTINGS_SCHEMA: list[dict] = [
              "choices": ["claude-sonnet-5", "claude-haiku-4-5"],
              "help": "Used for desk vision, documents and hard questions. "
                      "Pick Haiku here too to minimise cost (weaker vision)."},
+            {"key": "LLM_MODEL_DEEP", "label": "Deep-work model (on demand)", "type": "select",
+             "choices": ["claude-opus-4-8", "claude-sonnet-5"],
+             "help": "Only used when you ask for heavy output — say 'in-depth', "
+                     "'deep dive', 'comprehensive', or 'use opus' in your request. "
+                     "Opus is the strongest and priciest model; it never runs on "
+                     "ordinary chat. Pick Sonnet here to opt out of the extra cost."},
             {"key": "LLM_MAX_TOKENS", "label": "Max reply length (tokens)", "type": "number",
              "min": 128, "max": 4096,
              "help": "Longer replies cost more. 1024 ≈ a few paragraphs."},

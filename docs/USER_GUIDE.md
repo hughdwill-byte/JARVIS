@@ -141,6 +141,21 @@ questions never touch tools.
 | `/agent <task>` | Optional: *force* task mode explicitly |
 | `/apps` | List connected apps (Gmail, calendar, …) and their status |
 
+### Heavy work on demand — the Opus tier
+
+For most things JARVIS quietly uses the cheap model, stepping up to the smart one only
+when the task earns it. When you need serious output — a proper report, a deep analysis —
+just say so and it brings out the big model (Opus), with a much longer reply budget:
+
+> *"write me an in-depth report on battery chemistries for my project"* · *"do a deep
+> dive into this dataset"* · *"use opus: compare these two architectures"*
+
+Trigger words: **"in-depth"**, **"deep dive"**, **"comprehensive"**, **"thorough
+analysis"**, or the explicit **"use opus"**. It costs more per request (roughly
+$0.25–$1 per report on the API — see [`COST_CONTROL.md`](COST_CONTROL.md)), and it
+*never* runs unless you summon it. Which model answers the call is configurable in
+**Settings → AI Brain → Deep-work model**.
+
 Which folders it may touch — and the off switch — live in **Settings → Computer & Apps**.
 Connecting Gmail/calendar takes one config file and a one-time login:
 [`COMPUTER_AND_APPS.md`](COMPUTER_AND_APPS.md).
@@ -158,7 +173,8 @@ English. The important ones:
   fastest), `claude_code` (your Claude Pro subscription — no API cost, slower), or
   `hybrid` (chat on the API, big tasks on your subscription — recommended if you have
   Pro; setup in [`COST_CONTROL.md`](COST_CONTROL.md#already-paying-for-claude-pro-use-it-as-the-brain)).
-  Plus your API key (shown masked once saved) and which models to use.
+  Plus your API key (shown masked once saved) and which models to use — including the
+  *Deep-work model* (Opus) that only runs when you ask for an in-depth job.
 - **Microphone & Speech** — pick your mic *by name*. If JARVIS hears you badly, check you
   selected the desk speakerphone, not the laptop's built-in mic.
 - **Hands-free wake word** — on/off toggle and the sensitivity slider.
