@@ -19,6 +19,8 @@ _PHRASE_ROUTES: list[tuple[re.Pattern, str, str]] = [
     (re.compile(r"\bstop (talking|speaking)\b", re.I), "stop", ""),
     (re.compile(r"^(shutdown|shut down|stop listening|go to sleep)[.!]?$", re.I), "sleep", ""),
     (re.compile(r"^(start listening|wake up)[.!]?$", re.I), "listen", ""),
+    (re.compile(r"^(good morning|morning)[,.!]?( jarvis)?[.!]?$", re.I), "briefing", ""),
+    (re.compile(r"\b(morning|daily) briefing\b", re.I), "briefing", ""),
 ]
 
 

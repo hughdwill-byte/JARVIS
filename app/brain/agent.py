@@ -21,6 +21,7 @@ from __future__ import annotations
 import re
 import subprocess
 import sys
+import time
 import webbrowser
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
@@ -30,6 +31,7 @@ from app.brain.llm_client import (
     SentenceStreamer,
     cached_system,
     max_tokens_for,
+    record_api_usage,
     web_search_tool,
 )
 from app.config import Config
@@ -285,6 +287,7 @@ class Agent:
         for _step in range(self.cfg.agent_max_steps):
             # Deep work (reports) needs room to write; everyday steps stay capped.
             max_tokens = max_tokens_for(self.cfg, model, 2048)
+            started = time.monotonic()
             try:
                 if can_stream:
                     # Stream so speech can start on the FIRST sentence, not the last.
@@ -308,6 +311,8 @@ class Agent:
             except Exception as exc:
                 log.error("Agent LLM call failed: %s", exc)
                 return self.llm._explain_error(exc), actions
+
+            record_api_usage(model, resp, started)
 
             if resp.stop_reason == "pause_turn":
                 # A long-running server tool (web search) paused mid-turn:

@@ -23,8 +23,10 @@ import os
 import re
 import shutil
 import subprocess
+import time
 from typing import Callable
 
+from app.brain import usage
 from app.config import Config
 from app.logger import get_logger
 from app.prompts import AGENT_SYSTEM_PROMPT, SYSTEM_PROMPT, current_datetime_line
@@ -140,6 +142,16 @@ def max_tokens_for(cfg: Config, model: str, requested: int | None = None) -> int
     return base
 
 
+def record_api_usage(model: str, resp, started: float) -> None:
+    """Log tokens/cost for one Anthropic API response (no-op if untracked)."""
+    u = getattr(resp, "usage", None)
+    if u is not None:
+        usage.record("api", model,
+                     getattr(u, "input_tokens", 0) or 0,
+                     getattr(u, "output_tokens", 0) or 0,
+                     int((time.monotonic() - started) * 1000))
+
+
 class LLMClient:
     def __init__(self, cfg: Config):
         self.cfg = cfg
@@ -193,6 +205,7 @@ class LLMClient:
 
         model = self.pick_model(user_text, force_smart)
         search = web_search_tool(self.cfg)
+        started = time.monotonic()
         try:
             resp = self._client.messages.create(
                 model=model,
@@ -201,6 +214,7 @@ class LLMClient:
                 messages=messages,
                 **({"tools": [search]} if search else {}),
             )
+            record_api_usage(model, resp, started)
             return "".join(b.text for b in resp.content if b.type == "text").strip()
         except Exception as exc:
             log.error("LLM call failed (%s): %s", model, exc)
@@ -210,6 +224,7 @@ class LLMClient:
         """Send one image + instruction to the smart model."""
         if not self.available:
             return OFFLINE_NOTICE
+        started = time.monotonic()
         try:
             resp = self._client.messages.create(
                 model=self.cfg.llm_model_smart,
@@ -225,6 +240,7 @@ class LLMClient:
                     ],
                 }],
             )
+            record_api_usage(self.cfg.llm_model_smart, resp, started)
             return "".join(b.text for b in resp.content if b.type == "text").strip()
         except Exception as exc:
             log.error("Vision call failed: %s", exc)
@@ -457,4 +473,8 @@ def create_llm_client(cfg: Config):
         return ClaudeCodeClient(cfg)
     if cfg.llm_provider == "hybrid":
         return HybridClient(cfg)
+    if cfg.llm_provider in ("ollama", "local_first"):
+        # runtime import: ollama_client imports from this module
+        from app.brain.ollama_client import LocalFirstClient, OllamaClient
+        return OllamaClient(cfg) if cfg.llm_provider == "ollama" else LocalFirstClient(cfg)
     return LLMClient(cfg)  # "anthropic", or "none" -> offline fallbacks

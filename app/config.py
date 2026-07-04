@@ -57,6 +57,16 @@ class Config:
     llm_model_deep: str = "claude-opus-4-8"
     llm_max_tokens: int = 1024
 
+    # Local models via Ollama (LLM_PROVIDER=ollama or local_first).
+    # local_first = everyday chat on the free local model, cloud only for
+    # hard/deep/vision/agent work — the cheapest and most private setup.
+    ollama_host: str = "http://127.0.0.1:11434"
+    ollama_model: str = "qwen3:8b"
+    ollama_timeout_s: int = 120
+
+    # Markdown/Obsidian vault: where /export writes notes, memories and tasks.
+    obsidian_vault: Path = field(default_factory=lambda: PROJECT_ROOT / "data" / "vault")
+
     # Vision
     vision_provider: str = "anthropic"
     camera_index: int = 0
@@ -132,7 +142,8 @@ class Config:
     @property
     def llm_available(self) -> bool:
         """Whether the Anthropic API path should be initialised (key + a provider that uses it)."""
-        return self.llm_provider in ("anthropic", "hybrid") and bool(self.anthropic_api_key)
+        return (self.llm_provider in ("anthropic", "hybrid", "local_first")
+                and bool(self.anthropic_api_key))
 
 
 def load_config(env_file: str | os.PathLike | None = None) -> Config:
@@ -156,6 +167,11 @@ def load_config(env_file: str | os.PathLike | None = None) -> Config:
         llm_model_smart=os.getenv("LLM_MODEL_SMART", "claude-sonnet-5").strip(),
         llm_model_deep=os.getenv("LLM_MODEL_DEEP", "claude-opus-4-8").strip(),
         llm_max_tokens=_int(os.getenv("LLM_MAX_TOKENS"), 1024),
+        ollama_host=os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434").strip().rstrip("/"),
+        ollama_model=os.getenv("OLLAMA_MODEL", "qwen3:8b").strip(),
+        ollama_timeout_s=_int(os.getenv("OLLAMA_TIMEOUT_S"), 120),
+        obsidian_vault=Path(os.getenv("OBSIDIAN_VAULT", "").strip()
+                            or PROJECT_ROOT / "data" / "vault"),
         vision_provider=os.getenv("VISION_PROVIDER", "anthropic").strip().lower(),
         camera_index=_int(os.getenv("CAMERA_INDEX"), 0),
         vision_max_image_edge=_int(os.getenv("VISION_MAX_IMAGE_EDGE"), 1024),
