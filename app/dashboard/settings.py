@@ -30,13 +30,15 @@ SETTINGS_SCHEMA: list[dict] = [
                  "your Claude Pro subscription (Claude Code), or a mix of both.",
         "items": [
             {"key": "LLM_PROVIDER", "label": "Brain source", "type": "select",
-             "choices": ["anthropic", "hybrid", "claude_code", "none"],
+             "choices": ["anthropic", "local_first", "hybrid", "claude_code", "ollama", "none"],
              "help": "anthropic = API key (fastest replies, pay-as-you-go). "
+                     "local_first = everyday chat on a FREE local model via Ollama, "
+                     "cloud only for hard/vision/agent work — cheapest and most "
+                     "private (install ollama.com, then 'ollama pull qwen3:8b'). "
                      "claude_code = your Claude Pro/Max subscription, no API cost but "
-                     "~4-8s per reply (one-time setup: install Node.js, then "
-                     "'npm install -g @anthropic-ai/claude-code', then run 'claude' and "
-                     "log in). hybrid = best of both: chat on the API, big tasks "
-                     "(documents, vision) on your subscription. none = offline."},
+                     "~4-8s per reply. hybrid = chat on the API, big tasks on your "
+                     "subscription. ollama = local only ($0, offline; no agent/vision). "
+                     "none = offline."},
             {"key": "ANTHROPIC_API_KEY", "label": "Claude API key", "type": "password",
              "help": "Needed for 'anthropic' and 'hybrid'. Get one at console.anthropic.com "
                      "→ API keys. Starts with sk-ant-. Leave untouched to keep the saved key."},
@@ -47,9 +49,29 @@ SETTINGS_SCHEMA: list[dict] = [
              "choices": ["claude-sonnet-5", "claude-haiku-4-5"],
              "help": "Used for desk vision, documents and hard questions. "
                      "Pick Haiku here too to minimise cost (weaker vision)."},
+            {"key": "LLM_MODEL_DEEP", "label": "Deep-work model (on demand)", "type": "select",
+             "choices": ["claude-opus-4-8", "claude-sonnet-5"],
+             "help": "Only used when you ask for heavy output — say 'in-depth', "
+                     "'deep dive', 'comprehensive', or 'use opus' in your request. "
+                     "Opus is the strongest and priciest model; it never runs on "
+                     "ordinary chat. Pick Sonnet here to opt out of the extra cost."},
             {"key": "LLM_MAX_TOKENS", "label": "Max reply length (tokens)", "type": "number",
              "min": 128, "max": 4096,
              "help": "Longer replies cost more. 1024 ≈ a few paragraphs."},
+            {"key": "OLLAMA_MODEL", "label": "Local model (Ollama)", "type": "select",
+             "choices": ["qwen3:8b", "llama3.2", "gemma3", "qwen3:4b"],
+             "help": "Used by 'local_first' and 'ollama' brain sources. qwen3:8b is the "
+                     "best all-rounder on ~8GB; qwen3:4b for weaker machines. "
+                     "Install first: ollama pull <model>."},
+            {"key": "OLLAMA_HOST", "label": "Ollama address", "type": "text",
+             "help": "Where the local model server runs. Default is this computer "
+                     "(http://127.0.0.1:11434); change only if Ollama runs on another "
+                     "machine on your network."},
+            {"key": "EMBED_MODEL", "label": "Search model (embeddings)", "type": "select",
+             "choices": ["nomic-embed-text", "mxbai-embed-large", "all-minilm"],
+             "help": "Powers /ask and /index — searching your own notes & vault. "
+                     "Runs locally on Ollama (free, private). Install first: "
+                     "ollama pull nomic-embed-text."},
             {"key": "WEB_SEARCH_ENABLED", "label": "Web search", "type": "toggle",
              "help": "Lets JARVIS look things up (news, sports scores, prices, docs). "
                      "Costs about 1 cent per search on the API backend."},
@@ -108,8 +130,16 @@ SETTINGS_SCHEMA: list[dict] = [
              "help": "System default follows your OS sound settings; pick a specific "
                      "device to lock JARVIS to it."},
             {"key": "TTS_PROVIDER", "label": "Voice output", "type": "select",
-             "choices": ["pyttsx3", "none"],
-             "help": "pyttsx3 = free offline voice. none = silent, text-only replies."},
+             "choices": ["pyttsx3", "piper", "none"],
+             "help": "pyttsx3 = free offline OS voice (robotic but zero setup). "
+                     "piper = natural offline neural voice (needs the piper binary + "
+                     "a downloaded .onnx voice; set it below). none = text-only. "
+                     "If piper isn't set up, JARVIS quietly falls back to the OS voice."},
+            {"key": "PIPER_VOICE_MODEL", "label": "Piper voice model (.onnx)", "type": "text",
+             "help": "Only for the 'piper' voice. Full path to a downloaded voice file, "
+                     "e.g. ~/piper/en_US-lessac-medium.onnx. Get voices from "
+                     "github.com/rhasspy/piper/releases (download the .onnx AND its "
+                     ".onnx.json into the same folder)."},
             {"key": "TTS_VOICE", "label": "Voice", "type": "select",
              "source": "tts_voices",
              "help": "Your operating system's speech voices. macOS tip: get much nicer "
@@ -175,6 +205,10 @@ SETTINGS_SCHEMA: list[dict] = [
             {"key": "DASHBOARD_PORT", "label": "Dashboard port", "type": "number",
              "min": 1024, "max": 65535,
              "help": "Change if 8321 clashes with something. Takes effect on next app start."},
+            {"key": "OBSIDIAN_VAULT", "label": "Markdown/Obsidian vault folder", "type": "text",
+             "help": "Where /export writes notes, memories and tasks as Markdown. "
+                     "Point it at a folder inside your Obsidian vault to browse "
+                     "JARVIS memory there. Default: data/vault."},
             {"key": "PROJECTS_DIR", "label": "Default projects folder", "type": "text",
              "help": "Folder /project loads when you don't give a path. Example: "
                      "C:\\Users\\you\\uni or /Users/you/uni"},

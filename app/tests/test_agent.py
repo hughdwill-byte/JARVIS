@@ -303,6 +303,82 @@ def test_reply_spoken_excludes_action_log():
     assert Reply("plain").spoken == "plain"
 
 
+def test_agent_run_uses_deep_model_for_heavy_tasks(agent_cfg):
+    """'/agent write an in-depth report...' runs on the deep model, start to finish."""
+    cfg, ws = agent_cfg
+    agent, client = _agent_with(cfg, [
+        SimpleNamespace(content=[_tool_use("list_dir", {"path": str(ws)})],
+                        stop_reason="tool_use"),
+        SimpleNamespace(content=[_text("Report done.")], stop_reason="end_turn"),
+    ])
+    agent.run("write an in-depth report comparing my two project drafts")
+    assert client.calls[0]["model"] == cfg.llm_model_deep
+    # tool use must NOT downgrade the deep run to the smart model
+    assert client.calls[1]["model"] == cfg.llm_model_deep
+    # and deep work gets a report-sized reply budget
+    from app.brain.llm_client import DEEP_MAX_TOKENS
+    assert client.calls[0]["max_tokens"] == DEEP_MAX_TOKENS
+
+
+def test_agent_run_uses_smart_model_for_ordinary_tasks(agent_cfg):
+    cfg, _ws = agent_cfg
+    agent, client = _agent_with(cfg, [
+        SimpleNamespace(content=[_text("Done.")], stop_reason="end_turn"),
+    ])
+    agent.run("tidy my workspace folder")
+    assert client.calls[0]["model"] == cfg.llm_model_smart
+
+
+# --- auto-agent intent detection ---------------------------------------------------
+
+def test_looks_like_computer_task():
+    from app.brain.router import looks_like_computer_task
+    for text in (
+        "tidy my Downloads folder into subfolders by file type",
+        "check my email for anything from my tutor",
+        "make me a csv file with these results",
+        "find every pdf about thermodynamics on this machine",
+        "send an email to my study group",
+        "what's in my documents folder?",
+    ):
+        assert looks_like_computer_task(text), text
+    for text in (
+        "what's the capital of France?",
+        "explain entropy like I'm five",
+        "how do I cite a website in APA?",
+    ):
+        assert not looks_like_computer_task(text), text
+
+
+def test_chat_routes_action_requests_to_agent_on_claude_code_backend(cfg):
+    """No /agent needed: on the tool-less claude_code backend, action-shaped
+    requests go to agent mode automatically; plain questions stay plain chat."""
+    bot = Assistant(cfg)
+    try:
+        calls = {}
+
+        class StubClaudeCode:
+            available = True
+            raw = None  # like ClaudeCodeClient: no API tool loop
+
+            def agent_task(self, task, workdir, auto_approve):
+                calls["task"] = task
+                return "Tidied your Downloads."
+
+            def chat(self, *a, **k):
+                return "plain chat answer"
+
+        bot.llm = StubClaudeCode()
+        reply = bot.handle("tidy my Downloads folder into subfolders")
+        assert calls["task"] == "tidy my Downloads folder into subfolders"
+        assert "Tidied" in reply.text
+        reply2 = bot.handle("what's the capital of France?")
+        assert reply2.text == "plain chat answer"
+        assert calls["task"] == "tidy my Downloads folder into subfolders"  # unchanged
+    finally:
+        bot.close()
+
+
 # --- assistant wiring ------------------------------------------------------------
 
 def test_agent_command_offline_and_disabled(cfg):

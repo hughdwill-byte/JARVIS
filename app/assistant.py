@@ -10,6 +10,7 @@ import threading
 from collections import deque
 from dataclasses import dataclass
 
+from app.audio.latency import LatencyLog, set_log
 from app.audio.push_to_talk import PushToTalk
 from app.audio.speech_to_text import Transcriber
 from app.audio.text_to_speech import Speaker
@@ -17,16 +18,20 @@ from app.audio.voice_loop import VoiceLoop
 from app.brain.agent import Agent, AgentTools
 from app.brain.llm_client import create_llm_client
 from app.brain.mcp_client import MCPManager
-from app.brain.router import Router
+from app.brain.rag import KnowledgeBase
+from app.brain.router import Router, looks_like_computer_task
 from app.brain.tool_manager import ToolManager
+from app.brain.usage import UsageTracker, set_tracker
 from app.config import Config
 from app.logger import get_logger, setup_logging
 from app.memory.database import Database
 from app.memory.notes import Notes
 from app.memory.preferences import Preferences
 from app.prompts import build_context_block
+from app.tools.briefing import build_briefing
 from app.tools.code_helper import CodeHelper
 from app.tools.documents import DocumentTool
+from app.tools.vault_export import export_vault
 from app.tools.project_files import ProjectTool
 from app.tools.reminders import ReminderManager
 from app.tools.study_tools import StudyTools, integrity_check
@@ -58,6 +63,10 @@ class Assistant:
         cfg.ensure_dirs()
 
         self.db = Database(cfg.database_path)
+        self.usage = UsageTracker(self.db)
+        set_tracker(self.usage)  # every LLM call logs tokens/cost from here on
+        self.latency = LatencyLog()
+        set_log(self.latency)    # STT + TTS timings feed /voicestats
         self.llm = create_llm_client(cfg)
         self.speaker = Speaker(cfg)
         self.transcriber = Transcriber(cfg)
@@ -73,6 +82,7 @@ class Assistant:
         self.projects = ProjectTool(cfg, self.llm)
         self.study = StudyTools(self.llm)
         self.code = CodeHelper(self.llm)
+        self.knowledge = KnowledgeBase(cfg, self.db, self.llm)
 
         # Hands-free mode: created here, started by the front-end (run_assistant).
         self.voice_loop = VoiceLoop(self) if cfg.wake_word_enabled else None
@@ -123,6 +133,14 @@ class Assistant:
         t.register("deltask", "delete a task by number", self.tasks.delete)
         t.register("remind", "set a reminder: /remind 25m stretch", self.reminders.add)
         t.register("reminders", "list pending reminders", lambda _: self.reminders.list_text(), speak_reply=False)
+        t.register("briefing", "morning briefing (or say 'good morning')",
+                   lambda _: build_briefing(self.db))
+        t.register("export", "export notes/memories/tasks to a Markdown/Obsidian vault",
+                   lambda _: export_vault(self.db, self.cfg.obsidian_vault), speak_reply=False)
+        t.register("index", "(re)build the searchable index of your notes & vault",
+                   lambda _: self.knowledge.reindex(), speak_reply=False)
+        t.register("ask", "answer from YOUR notes/vault, with citations: /ask ...",
+                   self.knowledge.ask, speak_reply=False)
         # Documents & projects
         t.register("doc", "ingest + summarise a PDF/text file", self.docs.ingest_and_summarise, speak_reply=False)
         t.register("docq", "ask about the loaded document", self.docs.ask)
@@ -147,6 +165,10 @@ class Assistant:
         t.register("sleep", "stop hands-free mode (mic fully off)", self._cmd_sleep)
         t.register("clear", "clear conversation history", self._cmd_clear)
         t.register("status", "show device/API status", lambda _: self.status_text(), speak_reply=False)
+        t.register("usage", "LLM spend: calls, tokens, estimated cost", lambda _: self.usage.summary_text(), speak_reply=False)
+        t.register("voicestats", "voice latency: speech-to-text & TTS timing", lambda _: self.latency.summary_text(), speak_reply=False)
+        t.register("brief", "short spoken replies from now on", lambda _: self._set_reply_style("brief"))
+        t.register("detailed", "full detailed replies from now on", lambda _: self._set_reply_style("detailed"))
 
     # --- command handlers ------------------------------------------------
     def _cmd_snapshot(self, _: str) -> str:
@@ -228,6 +250,21 @@ class Assistant:
         self.db.clear_conversation()
         return "Conversation history cleared. Fresh start."
 
+    def _set_reply_style(self, style: str) -> str:
+        self.db.set_preference("reply_style", style)
+        if style == "brief":
+            return "Brief mode on — I'll keep it to a sentence or two."
+        return "Detailed mode on — full answers from here."
+
+    def _reply_style_line(self) -> str:
+        style = self.db.get_preference("reply_style")
+        if style == "brief":
+            return ("[Reply style] BRIEF MODE: answer in one or two short sentences "
+                    "unless the user explicitly asks for more.")
+        if style == "detailed":
+            return "[Reply style] DETAILED MODE: give complete, thorough answers."
+        return ""
+
     # --- agent mode -----------------------------------------------------------
     def _default_approval(self, tool_name: str, description: str) -> bool:
         """Used when no interactive prompt is attached (e.g. the web app)."""
@@ -245,11 +282,27 @@ class Assistant:
         if not self.llm.available:
             return ("Agent mode needs the AI brain — set it up in "
                     "Settings -> AI Brain first.")
-        # claude_code backend: delegate the task to Claude Code's own tools.
+        # Backends without their own tool loop delegate elsewhere:
         if self.llm.raw is None:
+            # local_first: chat stays local, but agent work runs on the wrapped
+            # cloud client — full tool loop, approvals, and connected apps.
+            api = getattr(self.llm, "api", None)
+            if api is not None and getattr(api, "raw", None) is not None:
+                self.mcp.ensure_started()
+                agent = Agent(self.cfg, api, AgentTools(self.cfg),
+                              self.approval_callback, self.mcp)
+                try:
+                    return agent.run(task)
+                except Exception as exc:
+                    log.exception("Agent run crashed")
+                    return f"Agent mode hit an error: {exc}"
+            # claude_code: delegate the task to Claude Code's own tools.
             agent_task = getattr(self.llm, "agent_task", None)
             if agent_task is None:
-                return "This brain backend can't run agent tasks."
+                return ("Agent tasks need the cloud brain — the local model can chat, "
+                        "but not run the multi-step tool loop. Set Brain source to "
+                        "'local_first' (chat stays local, agent work uses the API) "
+                        "and add an API key in Settings -> AI Brain.")
             workdir = str(AgentTools(self.cfg).allowed_dirs[0])
             return agent_task(task, workdir, self.cfg.agent_auto_approve)
         self.mcp.ensure_started()
@@ -263,6 +316,14 @@ class Assistant:
 
     def _cmd_apps(self, _: str) -> str:
         return self.mcp.status_text()
+
+    def _can_agent_without_raw(self) -> bool:
+        """Whether a backend without its own tool loop can still run agent tasks
+        (claude_code via agent_task; local_first via its wrapped cloud client)."""
+        if getattr(self.llm, "agent_task", None) is not None:
+            return True
+        api = getattr(self.llm, "api", None)
+        return api is not None and getattr(api, "raw", None) is not None
 
     # --- status / reminders ----------------------------------------------
     @staticmethod
@@ -370,6 +431,9 @@ class Assistant:
             tasks=self.tasks.open_titles(5),
             preferences=self.prefs.as_context(),
         )
+        style_line = self._reply_style_line()
+        if style_line:
+            context = (context + "\n\n" + style_line) if context else style_line
         history = self.db.recent_messages(self.cfg.memory_context_turns)
 
         # Normal conversation is tool-capable: JARVIS uses the computer/apps by
@@ -402,6 +466,13 @@ class Assistant:
             if actions:
                 reply_text += "\n\nActions taken:\n" + "\n".join(f"  - {a}" for a in actions)
                 speak_text = final  # don't read the action log aloud
+        elif (self.cfg.agent_enabled and self.llm.available
+              and self._can_agent_without_raw()
+              and looks_like_computer_task(user_text)):
+            # claude_code backend: plain chat has no tools, so requests that
+            # clearly need the computer/apps go to agent mode automatically —
+            # same as typing /agent, without having to know the command.
+            reply_text = self._cmd_agent(user_text)
         else:
             reply_text = self.llm.chat(user_text, history=history, context_block=context)
 

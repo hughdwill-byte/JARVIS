@@ -141,9 +141,87 @@ questions never touch tools.
 | `/agent <task>` | Optional: *force* task mode explicitly |
 | `/apps` | List connected apps (Gmail, calendar, …) and their status |
 
+### Heavy work on demand — the Opus tier
+
+For most things JARVIS quietly uses the cheap model, stepping up to the smart one only
+when the task earns it. When you need serious output — a proper report, a deep analysis —
+just say so and it brings out the big model (Opus), with a much longer reply budget:
+
+> *"write me an in-depth report on battery chemistries for my project"* · *"do a deep
+> dive into this dataset"* · *"use opus: compare these two architectures"*
+
+Trigger words: **"in-depth"**, **"deep dive"**, **"comprehensive"**, **"thorough
+analysis"**, or the explicit **"use opus"**. It costs more per request (roughly
+$0.25–$1 per report on the API — see [`COST_CONTROL.md`](COST_CONTROL.md)), and it
+*never* runs unless you summon it. Which model answers the call is configurable in
+**Settings → AI Brain → Deep-work model**.
+
 Which folders it may touch — and the off switch — live in **Settings → Computer & Apps**.
 Connecting Gmail/calendar takes one config file and a one-time login:
 [`COMPUTER_AND_APPS.md`](COMPUTER_AND_APPS.md).
+
+### Local-first mode — free, private everyday chat
+
+JARVIS can run everyday chat on a **free model on your own computer** and only
+reach for the paid cloud when it actually helps (hard questions, desk vision,
+documents, and agent tasks). It's the cheapest *and* most private setup.
+
+One-time setup:
+1. Install [Ollama](https://ollama.com) (it starts on its own after install).
+2. In a terminal: `ollama pull qwen3:8b` (use `qwen3:4b` on an older machine).
+3. **Settings → AI Brain → Brain source → `local_first`**, then Save & Apply.
+
+Keep your Claude API key in Settings — local-first uses it only when a request
+is worth the cloud. Want *everything* offline? Pick `ollama` instead (chat only;
+vision and agent tasks need the cloud). See [`COST_CONTROL.md`](COST_CONTROL.md).
+
+### A more natural voice (Piper)
+
+The default voice (`pyttsx3`) is free and instant but robotic. For a warm,
+natural voice that still runs **entirely offline**, switch to **Piper**:
+
+1. Install piper — see [github.com/rhasspy/piper](https://github.com/rhasspy/piper)
+   (a single binary; put it on your PATH).
+2. Download a voice, e.g. `en_US-lessac-medium` — you need **both** the `.onnx`
+   and its `.onnx.json`, in the same folder.
+3. **Settings → Speaker & Voice output → Voice output → `piper`**, then paste the
+   full path to the `.onnx` file into **Piper voice model**. Save & Apply.
+
+If piper or the model isn't found, JARVIS quietly uses the OS voice — turning
+this on can never leave you with a mute assistant. Curious how fast the voice
+pipeline is? Type `/voicestats` for speech-to-text and synthesis timings.
+
+### Ask your own notes (`/ask`) — private, cited search
+
+JARVIS can answer from **your own material** — saved notes, long-term memories,
+and any Markdown in your vault — and cite where each answer came from, instead of
+guessing. It's fully local and free (search runs on Ollama).
+
+1. One-time: install [Ollama](https://ollama.com), then `ollama pull nomic-embed-text`.
+2. Build the index: `/index` (re-run it after adding notes or vault files).
+3. Ask: `/ask what did I decide about the thesis topic?` — or just say
+   *"search my notes about thermodynamics"*.
+
+Answers end with a **Sources** list ([1], [2] …). If the answer isn't in your
+saved material, JARVIS says so rather than making something up. Add material with
+`/note …`, `/remember …`, `/export` (mirrors memory to your vault), or by writing
+Markdown straight into the vault folder — then `/index` again.
+
+### Proactive & housekeeping commands
+
+| Command | Purpose |
+|---|---|
+| `good morning` / `/briefing` | Spoken daily briefing: date, open tasks, due items, reminders, latest note |
+| `/ask …` | Answer from YOUR notes/memories/vault, with citations |
+| `/index` | (Re)build the searchable index of your notes & vault |
+| `/usage` | What JARVIS has cost you — calls, tokens, estimated $ (today / 7 days / 30 days) |
+| `/voicestats` | Voice speed — speech-to-text and text-to-speech timing (recent) |
+| `/brief` · `/detailed` | Switch between short spoken replies and full detailed ones |
+| `/export` | Write your notes, memories and tasks to a Markdown/Obsidian vault |
+
+`/export` writes to the folder in **Settings → Advanced → Markdown/Obsidian vault**
+(default `data/vault`). Point it inside an Obsidian vault and everything JARVIS
+remembers becomes browsable and searchable there — in plain Markdown you own.
 
 ### Control
 `/listen` mic on · `/sleep` mic off · `/stop` stop speaking · `/status` component health ·
@@ -158,7 +236,8 @@ English. The important ones:
   fastest), `claude_code` (your Claude Pro subscription — no API cost, slower), or
   `hybrid` (chat on the API, big tasks on your subscription — recommended if you have
   Pro; setup in [`COST_CONTROL.md`](COST_CONTROL.md#already-paying-for-claude-pro-use-it-as-the-brain)).
-  Plus your API key (shown masked once saved) and which models to use.
+  Plus your API key (shown masked once saved) and which models to use — including the
+  *Deep-work model* (Opus) that only runs when you ask for an in-depth job.
 - **Microphone & Speech** — pick your mic *by name*. If JARVIS hears you badly, check you
   selected the desk speakerphone, not the laptop's built-in mic.
 - **Hands-free wake word** — on/off toggle and the sensitivity slider.

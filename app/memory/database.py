@@ -55,6 +55,25 @@ CREATE TABLE IF NOT EXISTS scenes (
     summary TEXT NOT NULL,
     objects TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS knowledge (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at TEXT NOT NULL,
+    source TEXT NOT NULL,
+    ref TEXT,
+    chunk_index INTEGER NOT NULL DEFAULT 0,
+    content TEXT NOT NULL,
+    embedding TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS llm_usage (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at TEXT NOT NULL,
+    backend TEXT NOT NULL,
+    model TEXT NOT NULL,
+    input_tokens INTEGER NOT NULL DEFAULT 0,
+    output_tokens INTEGER NOT NULL DEFAULT 0,
+    cost_usd REAL NOT NULL DEFAULT 0,
+    latency_ms INTEGER NOT NULL DEFAULT 0
+);
 """
 
 
@@ -85,6 +104,45 @@ class Database:
     def _query(self, sql: str, params: tuple = ()) -> list[sqlite3.Row]:
         with self._lock:
             return self._conn.execute(sql, params).fetchall()
+
+    # --- knowledge (RAG embedding index) --------------------------
+    def clear_knowledge(self) -> None:
+        self._execute("DELETE FROM knowledge")
+
+    def add_knowledge(self, source: str, ref: str, chunk_index: int,
+                      content: str, embedding_json: str) -> None:
+        self._execute(
+            "INSERT INTO knowledge (created_at, source, ref, chunk_index, content, "
+            "embedding) VALUES (?, ?, ?, ?, ?, ?)",
+            (_now(), source, ref, chunk_index, content, embedding_json),
+        )
+
+    def all_knowledge(self) -> list[sqlite3.Row]:
+        return self._query("SELECT source, ref, content, embedding FROM knowledge")
+
+    def knowledge_count(self) -> int:
+        rows = self._query("SELECT COUNT(*) AS n FROM knowledge")
+        return rows[0]["n"] if rows else 0
+
+    # --- LLM usage (cost tracking) --------------------------------
+    def add_usage(self, backend: str, model: str, input_tokens: int,
+                  output_tokens: int, cost_usd: float, latency_ms: int) -> None:
+        self._execute(
+            "INSERT INTO llm_usage (created_at, backend, model, input_tokens, "
+            "output_tokens, cost_usd, latency_ms) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (_now(), backend, model, input_tokens, output_tokens, cost_usd, latency_ms),
+        )
+
+    def usage_since(self, since_iso: str) -> list[sqlite3.Row]:
+        """Per-model totals since the given UTC ISO timestamp."""
+        return self._query(
+            "SELECT backend, model, COUNT(*) AS calls, "
+            "SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens, "
+            "SUM(cost_usd) AS cost_usd, AVG(latency_ms) AS avg_latency_ms "
+            "FROM llm_usage WHERE created_at >= ? "
+            "GROUP BY backend, model ORDER BY cost_usd DESC",
+            (since_iso,),
+        )
 
     # --- notes ---------------------------------------------------
     def add_note(self, content: str) -> int:

@@ -27,6 +27,7 @@ import threading
 import time
 from pathlib import Path
 
+from app.audio import latency
 from app.config import Config
 from app.logger import get_logger
 
@@ -45,12 +46,22 @@ class Speaker:
         self._skip = threading.Event()   # set by stop(): abandon current + queued
         self._engine = None              # active pyttsx3 engine (if any)
         self._proc: subprocess.Popen | None = None  # active `say` process (if any)
-        self._enabled = cfg.tts_provider == "pyttsx3"
+        self._enabled = cfg.tts_provider in ("pyttsx3", "piper")
         self.last_text: str = ""         # what JARVIS last said (echo filtering)
         self._finished_at: float = 0.0   # monotonic time speech last ended
         self._say = shutil.which("say") if _IS_MAC else None
         self._voice_name_cache: dict[str, str] | None = None
-        if self._enabled and not self._say:
+        # Piper: natural neural voice. Detected only when selected; if the
+        # binary or model is missing we quietly fall back to the OS voice.
+        self._piper = shutil.which(cfg.piper_binary) if cfg.tts_provider == "piper" else None
+        self._piper_warned = False
+        if cfg.tts_provider == "piper" and not self._piper:
+            log.warning("TTS_PROVIDER=piper but the '%s' binary isn't on PATH — "
+                        "using the OS voice instead. Install piper "
+                        "(https://github.com/rhasspy/piper) to get the natural voice.",
+                        cfg.piper_binary)
+        # Only require pyttsx3 as a fallback when neither `say` nor piper is available.
+        if self._enabled and not self._say and not self._piper:
             try:
                 import pyttsx3  # noqa: F401  (probe; engines are per-utterance)
             except ImportError:
@@ -155,12 +166,77 @@ class Speaker:
 
     # --- playback backends --------------------------------------------------------
     def _play(self, text: str) -> None:
+        # Piper handles its own device routing, so it goes first.
+        if self._piper and self._play_piper(text):
+            return
         if self.cfg.speaker_device_index is not None and self._play_routed(text):
             return
         if self._say:
             self._play_macos_say(text)
         else:
             self._play_pyttsx3(text)
+
+    def _play_piper(self, text: str) -> bool:
+        """Synthesise with Piper (natural neural voice) and play the WAV.
+        Returns False on any problem so the caller falls back to the OS voice."""
+        model = self.cfg.piper_voice_model
+        model_path = Path(model).expanduser() if model else None
+        if not model_path or not model_path.exists():
+            if not self._piper_warned:
+                log.warning("Piper voice model not found (PIPER_VOICE_MODEL=%r) — "
+                            "using the OS voice. Download a .onnx voice from "
+                            "https://github.com/rhasspy/piper/releases and point "
+                            "PIPER_VOICE_MODEL at it.", model)
+                self._piper_warned = True
+            return False
+        try:
+            import sounddevice as sd
+            import soundfile as sf
+        except ImportError:
+            if not self._piper_warned:
+                log.warning("Piper playback needs: pip install sounddevice soundfile")
+                self._piper_warned = True
+            return False
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                wav = Path(tmp) / "piper.wav"
+                cmd = [self._piper, "--model", str(model_path),
+                       "--output_file", str(wav)]
+                if self.cfg.piper_speaker is not None:
+                    cmd += ["--speaker", str(self.cfg.piper_speaker)]
+                started = time.monotonic()
+                self._proc = subprocess.Popen(
+                    cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
+                    stderr=subprocess.PIPE,
+                )
+                try:
+                    _, err = self._proc.communicate(input=text.encode("utf-8"),
+                                                    timeout=60)
+                except subprocess.TimeoutExpired:
+                    self._proc.kill()
+                    log.error("piper timed out synthesising; using OS voice")
+                    return False
+                rc = self._proc.returncode
+                self._proc = None
+                if self._skip.is_set():
+                    return True  # stop() fired mid-synth — nothing to play
+                if rc != 0 or not wav.exists() or wav.stat().st_size == 0:
+                    log.error("piper failed (exit %s): %s", rc,
+                              (err or b"").decode("utf-8", "replace")[:200])
+                    return False
+                latency.record("tts", (time.monotonic() - started) * 1000)
+                data, rate = sf.read(str(wav), dtype="float32")
+                if self._skip.is_set():
+                    return True
+                sd.play(data, rate, device=self.cfg.speaker_device_index)
+                sd.wait()
+            return True
+        except Exception as exc:
+            log.error("Piper synthesis/playback failed (%s); using OS voice", exc)
+            self._piper = None  # stop retrying this session
+            return False
+        finally:
+            self._proc = None
 
     def _play_macos_say(self, text: str) -> None:
         """macOS `say` blocks until playback completes — no overlap."""
