@@ -125,8 +125,16 @@ SETTINGS_SCHEMA: list[dict] = [
              "help": "System default follows your OS sound settings; pick a specific "
                      "device to lock JARVIS to it."},
             {"key": "TTS_PROVIDER", "label": "Voice output", "type": "select",
-             "choices": ["pyttsx3", "none"],
-             "help": "pyttsx3 = free offline voice. none = silent, text-only replies."},
+             "choices": ["pyttsx3", "piper", "none"],
+             "help": "pyttsx3 = free offline OS voice (robotic but zero setup). "
+                     "piper = natural offline neural voice (needs the piper binary + "
+                     "a downloaded .onnx voice; set it below). none = text-only. "
+                     "If piper isn't set up, JARVIS quietly falls back to the OS voice."},
+            {"key": "PIPER_VOICE_MODEL", "label": "Piper voice model (.onnx)", "type": "text",
+             "help": "Only for the 'piper' voice. Full path to a downloaded voice file, "
+                     "e.g. ~/piper/en_US-lessac-medium.onnx. Get voices from "
+                     "github.com/rhasspy/piper/releases (download the .onnx AND its "
+                     ".onnx.json into the same folder)."},
             {"key": "TTS_VOICE", "label": "Voice", "type": "select",
              "source": "tts_voices",
              "help": "Your operating system's speech voices. macOS tip: get much nicer "

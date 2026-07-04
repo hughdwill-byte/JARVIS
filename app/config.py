@@ -94,6 +94,12 @@ class Config:
     tts_rate: int = 180
     tts_voice: str = ""  # system voice id; "" = OS default (pick in Settings)
     speaker_device_index: int | None = None  # None = system default output
+    # Piper: natural, offline neural TTS (TTS_PROVIDER=piper). Needs the piper
+    # binary on PATH and a downloaded voice model (.onnx). Falls back to the OS
+    # voice if either is missing, so turning it on can never make JARVIS mute.
+    piper_binary: str = "piper"
+    piper_voice_model: str = ""      # path to a .onnx voice (e.g. en_US-lessac-medium.onnx)
+    piper_speaker: int | None = None  # multi-speaker voices: which speaker id
 
     # Storage
     database_path: Path = field(default_factory=lambda: PROJECT_ROOT / "data" / "jarvis.db")
@@ -189,6 +195,9 @@ def load_config(env_file: str | os.PathLike | None = None) -> Config:
         tts_rate=_int(os.getenv("TTS_RATE"), 180),
         tts_voice=os.getenv("TTS_VOICE", "").strip(),
         speaker_device_index=_opt_int(os.getenv("SPEAKER_DEVICE_INDEX")),
+        piper_binary=os.getenv("PIPER_BINARY", "piper").strip() or "piper",
+        piper_voice_model=os.getenv("PIPER_VOICE_MODEL", "").strip(),
+        piper_speaker=_opt_int(os.getenv("PIPER_SPEAKER")),
         database_path=database_path,
         memory_context_turns=_int(os.getenv("MEMORY_CONTEXT_TURNS"), 12),
         dashboard_host=os.getenv("DASHBOARD_HOST", "127.0.0.1").strip(),

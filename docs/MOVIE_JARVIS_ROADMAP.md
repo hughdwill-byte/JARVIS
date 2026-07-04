@@ -261,7 +261,8 @@ Each feature scored **1–5** (5 = best) on: **Movie** feel · **Use**fulness ·
 | Morning briefing | 5 | 5 | 4 | 5 | 5 | 1 | 1 | 1 | **Implemented** |
 | Brief/detailed modes | 3 | 4 | 4 | 5 | 3 | 1 | 1 | 1 | **Implemented** |
 | Obsidian export | 3 | 4 | 3 | 5 | 4 | 1 | 1 | 1 | **Implemented** |
-| Natural local TTS (Piper/Kokoro) | 5 | 4 | 5 | 5 | 4 | 3 | 2 | 2 | Proposed (P2) |
+| Natural local TTS (Piper) | 5 | 4 | 5 | 5 | 4 | 3 | 2 | 2 | **Implemented** |
+| Voice latency tracking | 2 | 3 | 4 | 5 | 3 | 1 | 1 | 1 | **Implemented** |
 | RAG over notes/files | 5 | 5 | 4 | 5 | 4 | 3 | 3 | 2 | Proposed (P3) |
 | Memory viewer/editor (web) | 3 | 5 | 5 | 4 | 3 | 3 | 2 | 2 | Proposed (P3/5) |
 | Scheduled monitors + "you should know" | 5 | 5 | 4 | 4 | 3 | 3 | 3 | 3 | Proposed (P6) |
@@ -306,8 +307,10 @@ log** — both small, both Phase 4.
 
 - **Phase 1 — Foundation … ✅ DONE:** Ollama backend, local-first router, usage
   tracking, config/settings/env, tests. (This branch.)
-- **Phase 2 — Voice:** add Piper/Kokoro as a `TTS_PROVIDER` option for natural
-  offline voice; measure end-to-end voice latency into `/usage`-style stats.
+- **Phase 2 — Voice … ✅ DONE:** Piper added as a `TTS_PROVIDER` (natural
+  offline neural voice, graceful fallback to the OS voice); STT + TTS-synthesis
+  latency instrumented and surfaced via `/voicestats`. *Remaining voice polish
+  (Kokoro/Chatterbox voice identity, wake-word tuning) is Phase 7.*
 - **Phase 3 — Memory & Obsidian:** local embeddings + SQLite vector table; RAG
   over vault/PDFs/projects with citations; web memory viewer/editor. (Export ✅.)
 - **Phase 4 — Tools & safety:** Home Assistant MCP; tool-call **audit log**; log
@@ -323,6 +326,13 @@ log** — both small, both Phase 4.
 ---
 
 ## 14. Files changed
+
+New (Phase 2):
+- `app/audio/latency.py` — `LatencyLog` + global record hook (STT/TTS timing).
+- `app/tests/test_voice_phase2.py` — 9 tests for Piper + latency.
+- Piper backend in `app/audio/text_to_speech.py`; STT timing in
+  `app/audio/speech_to_text.py`; `piper_*` config; Settings + `.env.example`;
+  `/voicestats` command.
 
 New (Phase 1):
 - `app/brain/ollama_client.py` — `OllamaClient` + `LocalFirstClient` (stdlib only).
@@ -372,14 +382,19 @@ Fully offline mode: `LLM_PROVIDER=ollama` (chat only; vision/agent need the clou
 
 ```
 python -m pytest app/tests/ -q
-97 passed, 1 skipped
+106 passed, 1 skipped
 ```
 
-The 22 new tests cover: local/cloud routing decisions, fallback when Ollama is
+Phase-1 tests (22) cover: local/cloud routing decisions, fallback when Ollama is
 down and when no API key is present, Ollama reply parsing + `<think>` stripping,
 setup-help messaging, cost math per model, usage recording/summary, briefing
-content and empty-state, Markdown/Obsidian export shape, and assistant command
-wiring — all runnable **offline with no API key and no Ollama server**.
+content and empty-state, Markdown/Obsidian export shape, and command wiring.
+
+Phase-2 tests (9) cover: latency ring-buffer record/summary/cap and the optional
+global hook; Piper provider selection; fallback-not-mute when the binary/model is
+missing; correct piper command construction (model, speaker, stdin text) with
+mocked synth+playback; and the `/voicestats` command. All runnable **offline with
+no API key, no Ollama server, no piper binary, and no audio hardware**.
 
 ---
 

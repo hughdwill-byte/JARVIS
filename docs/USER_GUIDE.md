@@ -175,12 +175,29 @@ Keep your Claude API key in Settings — local-first uses it only when a request
 is worth the cloud. Want *everything* offline? Pick `ollama` instead (chat only;
 vision and agent tasks need the cloud). See [`COST_CONTROL.md`](COST_CONTROL.md).
 
+### A more natural voice (Piper)
+
+The default voice (`pyttsx3`) is free and instant but robotic. For a warm,
+natural voice that still runs **entirely offline**, switch to **Piper**:
+
+1. Install piper — see [github.com/rhasspy/piper](https://github.com/rhasspy/piper)
+   (a single binary; put it on your PATH).
+2. Download a voice, e.g. `en_US-lessac-medium` — you need **both** the `.onnx`
+   and its `.onnx.json`, in the same folder.
+3. **Settings → Speaker & Voice output → Voice output → `piper`**, then paste the
+   full path to the `.onnx` file into **Piper voice model**. Save & Apply.
+
+If piper or the model isn't found, JARVIS quietly uses the OS voice — turning
+this on can never leave you with a mute assistant. Curious how fast the voice
+pipeline is? Type `/voicestats` for speech-to-text and synthesis timings.
+
 ### Proactive & housekeeping commands
 
 | Command | Purpose |
 |---|---|
 | `good morning` / `/briefing` | Spoken daily briefing: date, open tasks, due items, reminders, latest note |
 | `/usage` | What JARVIS has cost you — calls, tokens, estimated $ (today / 7 days / 30 days) |
+| `/voicestats` | Voice speed — speech-to-text and text-to-speech timing (recent) |
 | `/brief` · `/detailed` | Switch between short spoken replies and full detailed ones |
 | `/export` | Write your notes, memories and tasks to a Markdown/Obsidian vault |
 

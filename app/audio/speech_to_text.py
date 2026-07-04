@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 try:
@@ -9,6 +10,7 @@ try:
 except ImportError:
     np = None
 
+from app.audio import latency
 from app.config import Config
 from app.logger import get_logger
 
@@ -54,6 +56,7 @@ class Transcriber:
         if not self.available:
             return ""
         try:
+            started = time.monotonic()
             model = self._load()
             if sample_rate != 16000:
                 # Whisper wants 16kHz; cheap linear resample is fine for speech.
@@ -64,8 +67,10 @@ class Transcriber:
                     audio,
                 ).astype(np.float32)
             segments, _info = model.transcribe(audio, beam_size=1, language="en")
+            text = " ".join(s.text.strip() for s in segments).strip()
             self._fail_count = 0
-            return " ".join(s.text.strip() for s in segments).strip()
+            latency.record("stt", (time.monotonic() - started) * 1000)
+            return text
         except Exception as exc:
             self._fail_count += 1
             log.error("Transcription failed (%d/%d): %s — will retry",

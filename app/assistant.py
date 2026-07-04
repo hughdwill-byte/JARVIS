@@ -10,6 +10,7 @@ import threading
 from collections import deque
 from dataclasses import dataclass
 
+from app.audio.latency import LatencyLog, set_log
 from app.audio.push_to_talk import PushToTalk
 from app.audio.speech_to_text import Transcriber
 from app.audio.text_to_speech import Speaker
@@ -63,6 +64,8 @@ class Assistant:
         self.db = Database(cfg.database_path)
         self.usage = UsageTracker(self.db)
         set_tracker(self.usage)  # every LLM call logs tokens/cost from here on
+        self.latency = LatencyLog()
+        set_log(self.latency)    # STT + TTS timings feed /voicestats
         self.llm = create_llm_client(cfg)
         self.speaker = Speaker(cfg)
         self.transcriber = Transcriber(cfg)
@@ -157,6 +160,7 @@ class Assistant:
         t.register("clear", "clear conversation history", self._cmd_clear)
         t.register("status", "show device/API status", lambda _: self.status_text(), speak_reply=False)
         t.register("usage", "LLM spend: calls, tokens, estimated cost", lambda _: self.usage.summary_text(), speak_reply=False)
+        t.register("voicestats", "voice latency: speech-to-text & TTS timing", lambda _: self.latency.summary_text(), speak_reply=False)
         t.register("brief", "short spoken replies from now on", lambda _: self._set_reply_style("brief"))
         t.register("detailed", "full detailed replies from now on", lambda _: self._set_reply_style("detailed"))
 
