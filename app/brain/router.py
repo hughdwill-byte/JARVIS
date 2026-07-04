@@ -21,6 +21,9 @@ _PHRASE_ROUTES: list[tuple[re.Pattern, str, str]] = [
     (re.compile(r"^(start listening|wake up)[.!]?$", re.I), "listen", ""),
     (re.compile(r"^(good morning|morning)[,.!]?( jarvis)?[.!]?$", re.I), "briefing", ""),
     (re.compile(r"\b(morning|daily) briefing\b", re.I), "briefing", ""),
+    # "$REST" = pass whatever follows the matched prefix as the command args,
+    # e.g. "search my notes about thermo" -> /ask about thermo.
+    (re.compile(r"^(search|check|ask) my notes\b[:,]?\s*", re.I), "ask", "$REST"),
 ]
 
 
@@ -67,7 +70,10 @@ class Router:
             return "unknown", name
 
         for pattern, command, args in _PHRASE_ROUTES:
-            if pattern.search(text) and self.tools.get(command):
+            m = pattern.search(text)
+            if m and self.tools.get(command):
+                if args == "$REST":
+                    return command, text[m.end():].strip()
                 return command, args
 
         return None, text

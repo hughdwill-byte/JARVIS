@@ -18,6 +18,7 @@ from app.audio.voice_loop import VoiceLoop
 from app.brain.agent import Agent, AgentTools
 from app.brain.llm_client import create_llm_client
 from app.brain.mcp_client import MCPManager
+from app.brain.rag import KnowledgeBase
 from app.brain.router import Router, looks_like_computer_task
 from app.brain.tool_manager import ToolManager
 from app.brain.usage import UsageTracker, set_tracker
@@ -81,6 +82,7 @@ class Assistant:
         self.projects = ProjectTool(cfg, self.llm)
         self.study = StudyTools(self.llm)
         self.code = CodeHelper(self.llm)
+        self.knowledge = KnowledgeBase(cfg, self.db, self.llm)
 
         # Hands-free mode: created here, started by the front-end (run_assistant).
         self.voice_loop = VoiceLoop(self) if cfg.wake_word_enabled else None
@@ -135,6 +137,10 @@ class Assistant:
                    lambda _: build_briefing(self.db))
         t.register("export", "export notes/memories/tasks to a Markdown/Obsidian vault",
                    lambda _: export_vault(self.db, self.cfg.obsidian_vault), speak_reply=False)
+        t.register("index", "(re)build the searchable index of your notes & vault",
+                   lambda _: self.knowledge.reindex(), speak_reply=False)
+        t.register("ask", "answer from YOUR notes/vault, with citations: /ask ...",
+                   self.knowledge.ask, speak_reply=False)
         # Documents & projects
         t.register("doc", "ingest + summarise a PDF/text file", self.docs.ingest_and_summarise, speak_reply=False)
         t.register("docq", "ask about the loaded document", self.docs.ask)

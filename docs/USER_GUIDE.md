@@ -191,11 +191,29 @@ If piper or the model isn't found, JARVIS quietly uses the OS voice — turning
 this on can never leave you with a mute assistant. Curious how fast the voice
 pipeline is? Type `/voicestats` for speech-to-text and synthesis timings.
 
+### Ask your own notes (`/ask`) — private, cited search
+
+JARVIS can answer from **your own material** — saved notes, long-term memories,
+and any Markdown in your vault — and cite where each answer came from, instead of
+guessing. It's fully local and free (search runs on Ollama).
+
+1. One-time: install [Ollama](https://ollama.com), then `ollama pull nomic-embed-text`.
+2. Build the index: `/index` (re-run it after adding notes or vault files).
+3. Ask: `/ask what did I decide about the thesis topic?` — or just say
+   *"search my notes about thermodynamics"*.
+
+Answers end with a **Sources** list ([1], [2] …). If the answer isn't in your
+saved material, JARVIS says so rather than making something up. Add material with
+`/note …`, `/remember …`, `/export` (mirrors memory to your vault), or by writing
+Markdown straight into the vault folder — then `/index` again.
+
 ### Proactive & housekeeping commands
 
 | Command | Purpose |
 |---|---|
 | `good morning` / `/briefing` | Spoken daily briefing: date, open tasks, due items, reminders, latest note |
+| `/ask …` | Answer from YOUR notes/memories/vault, with citations |
+| `/index` | (Re)build the searchable index of your notes & vault |
 | `/usage` | What JARVIS has cost you — calls, tokens, estimated $ (today / 7 days / 30 days) |
 | `/voicestats` | Voice speed — speech-to-text and text-to-speech timing (recent) |
 | `/brief` · `/detailed` | Switch between short spoken replies and full detailed ones |

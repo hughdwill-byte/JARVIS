@@ -263,7 +263,8 @@ Each feature scored **1–5** (5 = best) on: **Movie** feel · **Use**fulness ·
 | Obsidian export | 3 | 4 | 3 | 5 | 4 | 1 | 1 | 1 | **Implemented** |
 | Natural local TTS (Piper) | 5 | 4 | 5 | 5 | 4 | 3 | 2 | 2 | **Implemented** |
 | Voice latency tracking | 2 | 3 | 4 | 5 | 3 | 1 | 1 | 1 | **Implemented** |
-| RAG over notes/files | 5 | 5 | 4 | 5 | 4 | 3 | 3 | 2 | Proposed (P3) |
+| RAG over notes/vault (local) | 5 | 5 | 4 | 5 | 4 | 3 | 3 | 2 | **Implemented** |
+| RAG over PDFs/project code | 4 | 4 | 4 | 5 | 4 | 2 | 2 | 2 | Proposed (P3+) |
 | Memory viewer/editor (web) | 3 | 5 | 5 | 4 | 3 | 3 | 2 | 2 | Proposed (P3/5) |
 | Scheduled monitors + "you should know" | 5 | 5 | 4 | 4 | 3 | 3 | 3 | 3 | Proposed (P6) |
 | Home Assistant via MCP | 5 | 4 | 4 | 4 | 5 | 3 | 2 | 3 | Proposed (P4) |
@@ -311,8 +312,12 @@ log** — both small, both Phase 4.
   offline neural voice, graceful fallback to the OS voice); STT + TTS-synthesis
   latency instrumented and surfaced via `/voicestats`. *Remaining voice polish
   (Kokoro/Chatterbox voice identity, wake-word tuning) is Phase 7.*
-- **Phase 3 — Memory & Obsidian:** local embeddings + SQLite vector table; RAG
-  over vault/PDFs/projects with citations; web memory viewer/editor. (Export ✅.)
+- **Phase 3 — Memory & Obsidian … ✅ (core) DONE:** local Ollama embeddings +
+  SQLite `knowledge` table; `/index` builds the index from notes, memories, and
+  vault Markdown; `/ask` retrieves top-k by cosine and answers **using only
+  those passages, with [n] citations** and an honest "not found". *Still to do:
+  ingest PDFs/project code into the same index; a web memory viewer/editor.*
+  (Markdown export ✅ shipped in Phase 1.)
 - **Phase 4 — Tools & safety:** Home Assistant MCP; tool-call **audit log**; log
   **redaction filter**; web-search tool with fallback chain.
 - **Phase 5 — iPhone UX:** PWA manifest on the dashboard; iOS Shortcuts bridge;
@@ -326,6 +331,16 @@ log** — both small, both Phase 4.
 ---
 
 ## 14. Files changed
+
+New (Phase 3):
+- `app/brain/embeddings.py` — `Embedder` (Ollama /api/embeddings), `cosine`,
+  `chunk_text` (stdlib only).
+- `app/brain/rag.py` — `KnowledgeBase`: reindex notes/memories/vault, cosine
+  search, cited `/ask` answering.
+- `app/tests/test_rag.py` — 11 tests (cosine, chunking, ranking, citations,
+  offline degradation, wiring).
+- `knowledge` table + DB methods; `embed_model` config; `/index` `/ask` commands;
+  "search my notes …" phrase route; Settings + `.env.example`.
 
 New (Phase 2):
 - `app/audio/latency.py` — `LatencyLog` + global record hook (STT/TTS timing).
@@ -382,7 +397,7 @@ Fully offline mode: `LLM_PROVIDER=ollama` (chat only; vision/agent need the clou
 
 ```
 python -m pytest app/tests/ -q
-106 passed, 1 skipped
+117 passed, 1 skipped
 ```
 
 Phase-1 tests (22) cover: local/cloud routing decisions, fallback when Ollama is
@@ -393,15 +408,23 @@ content and empty-state, Markdown/Obsidian export shape, and command wiring.
 Phase-2 tests (9) cover: latency ring-buffer record/summary/cap and the optional
 global hook; Piper provider selection; fallback-not-mute when the binary/model is
 missing; correct piper command construction (model, speaker, stdin text) with
-mocked synth+playback; and the `/voicestats` command. All runnable **offline with
-no API key, no Ollama server, no piper binary, and no audio hardware**.
+mocked synth+playback; and the `/voicestats` command.
+
+Phase-3 tests (11) cover: cosine (incl. zero-vector safety), chunking (short/long
+with overlap), reindex over notes+memories+vault, similarity ranking, `/ask`
+building cited context + honest "not found", offline setup-help for both `/ask`
+and `/index`, and the command + phrase-route wiring. A fake bag-of-words embedder
+keeps them deterministic. All runnable **offline with no API key, no Ollama
+server, no piper binary, and no audio hardware**.
 
 ---
 
 ## 17. Remaining gaps
 
-- **No RAG yet** — can store/export memory but not semantically search notes/PDFs.
-  (Phase 3, highest next value.)
+- **RAG covers notes/memories/vault, not yet PDFs/code** — `/ask` searches your
+  notes, memories and Markdown vault with citations; ingesting loaded PDFs and
+  project files into the same index is the next increment. A **web memory
+  viewer/editor** is still proposed.
 - **Local vision is absent** — desk vision still needs the cloud. (Acceptable;
   local VLMs are heavier and weaker.)
 - **No mobile surface** — desktop/web only. (Phase 5.)

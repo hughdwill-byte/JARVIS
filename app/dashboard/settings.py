@@ -67,6 +67,11 @@ SETTINGS_SCHEMA: list[dict] = [
              "help": "Where the local model server runs. Default is this computer "
                      "(http://127.0.0.1:11434); change only if Ollama runs on another "
                      "machine on your network."},
+            {"key": "EMBED_MODEL", "label": "Search model (embeddings)", "type": "select",
+             "choices": ["nomic-embed-text", "mxbai-embed-large", "all-minilm"],
+             "help": "Powers /ask and /index — searching your own notes & vault. "
+                     "Runs locally on Ollama (free, private). Install first: "
+                     "ollama pull nomic-embed-text."},
             {"key": "WEB_SEARCH_ENABLED", "label": "Web search", "type": "toggle",
              "help": "Lets JARVIS look things up (news, sports scores, prices, docs). "
                      "Costs about 1 cent per search on the API backend."},

@@ -63,6 +63,9 @@ class Config:
     ollama_host: str = "http://127.0.0.1:11434"
     ollama_model: str = "qwen3:8b"
     ollama_timeout_s: int = 120
+    # Local embedding model (for RAG: /ask and /index). Runs on the same
+    # Ollama server. Install once: `ollama pull nomic-embed-text`.
+    embed_model: str = "nomic-embed-text"
 
     # Markdown/Obsidian vault: where /export writes notes, memories and tasks.
     obsidian_vault: Path = field(default_factory=lambda: PROJECT_ROOT / "data" / "vault")
@@ -176,6 +179,7 @@ def load_config(env_file: str | os.PathLike | None = None) -> Config:
         ollama_host=os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434").strip().rstrip("/"),
         ollama_model=os.getenv("OLLAMA_MODEL", "qwen3:8b").strip(),
         ollama_timeout_s=_int(os.getenv("OLLAMA_TIMEOUT_S"), 120),
+        embed_model=os.getenv("EMBED_MODEL", "nomic-embed-text").strip() or "nomic-embed-text",
         obsidian_vault=Path(os.getenv("OBSIDIAN_VAULT", "").strip()
                             or PROJECT_ROOT / "data" / "vault"),
         vision_provider=os.getenv("VISION_PROVIDER", "anthropic").strip().lower(),

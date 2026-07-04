@@ -55,6 +55,15 @@ CREATE TABLE IF NOT EXISTS scenes (
     summary TEXT NOT NULL,
     objects TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS knowledge (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at TEXT NOT NULL,
+    source TEXT NOT NULL,
+    ref TEXT,
+    chunk_index INTEGER NOT NULL DEFAULT 0,
+    content TEXT NOT NULL,
+    embedding TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS llm_usage (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     created_at TEXT NOT NULL,
@@ -95,6 +104,25 @@ class Database:
     def _query(self, sql: str, params: tuple = ()) -> list[sqlite3.Row]:
         with self._lock:
             return self._conn.execute(sql, params).fetchall()
+
+    # --- knowledge (RAG embedding index) --------------------------
+    def clear_knowledge(self) -> None:
+        self._execute("DELETE FROM knowledge")
+
+    def add_knowledge(self, source: str, ref: str, chunk_index: int,
+                      content: str, embedding_json: str) -> None:
+        self._execute(
+            "INSERT INTO knowledge (created_at, source, ref, chunk_index, content, "
+            "embedding) VALUES (?, ?, ?, ?, ?, ?)",
+            (_now(), source, ref, chunk_index, content, embedding_json),
+        )
+
+    def all_knowledge(self) -> list[sqlite3.Row]:
+        return self._query("SELECT source, ref, content, embedding FROM knowledge")
+
+    def knowledge_count(self) -> int:
+        rows = self._query("SELECT COUNT(*) AS n FROM knowledge")
+        return rows[0]["n"] if rows else 0
 
     # --- LLM usage (cost tracking) --------------------------------
     def add_usage(self, backend: str, model: str, input_tokens: int,
