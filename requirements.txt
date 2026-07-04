@@ -31,5 +31,10 @@ pywebview>=5.0            # native window for run_app.py (macOS WebKit / Windows
 # --- Tests ---
 pytest>=8.0.0
 
+# --- Local models (optional; LLM_PROVIDER=local_first or ollama) ---
+# No Python package needed — JARVIS talks to Ollama's REST API with the
+# standard library. Just install the Ollama app (https://ollama.com) and run
+# `ollama pull qwen3:8b`. See docs/COST_CONTROL.md and docs/MOVIE_JARVIS_ROADMAP.md.
+
 # --- Optional future upgrades (uncomment when you want them) ---
 # edge-tts>=6.1.0         # much nicer free TTS voices (needs internet)

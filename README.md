@@ -23,6 +23,12 @@ settings screen, you can run JARVIS.
    talking to it, every command explained, study workflows, memory control.
 5. Something not working? **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)**.
 
+Want it cheaper and more private? **[docs/COST_CONTROL.md](docs/COST_CONTROL.md)**
+covers **local-first mode** — free everyday chat on your own computer via
+[Ollama](https://ollama.com), cloud only when it's worth it. The bigger picture
+(research, architecture, and where this is heading) lives in
+**[docs/MOVIE_JARVIS_ROADMAP.md](docs/MOVIE_JARVIS_ROADMAP.md)**.
+
 ## The 10-minute version
 
 On a computer with [Python 3.10+](https://python.org) and [Git](https://git-scm.com) installed:

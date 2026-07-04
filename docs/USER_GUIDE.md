@@ -160,6 +160,34 @@ Which folders it may touch — and the off switch — live in **Settings → Com
 Connecting Gmail/calendar takes one config file and a one-time login:
 [`COMPUTER_AND_APPS.md`](COMPUTER_AND_APPS.md).
 
+### Local-first mode — free, private everyday chat
+
+JARVIS can run everyday chat on a **free model on your own computer** and only
+reach for the paid cloud when it actually helps (hard questions, desk vision,
+documents, and agent tasks). It's the cheapest *and* most private setup.
+
+One-time setup:
+1. Install [Ollama](https://ollama.com) (it starts on its own after install).
+2. In a terminal: `ollama pull qwen3:8b` (use `qwen3:4b` on an older machine).
+3. **Settings → AI Brain → Brain source → `local_first`**, then Save & Apply.
+
+Keep your Claude API key in Settings — local-first uses it only when a request
+is worth the cloud. Want *everything* offline? Pick `ollama` instead (chat only;
+vision and agent tasks need the cloud). See [`COST_CONTROL.md`](COST_CONTROL.md).
+
+### Proactive & housekeeping commands
+
+| Command | Purpose |
+|---|---|
+| `good morning` / `/briefing` | Spoken daily briefing: date, open tasks, due items, reminders, latest note |
+| `/usage` | What JARVIS has cost you — calls, tokens, estimated $ (today / 7 days / 30 days) |
+| `/brief` · `/detailed` | Switch between short spoken replies and full detailed ones |
+| `/export` | Write your notes, memories and tasks to a Markdown/Obsidian vault |
+
+`/export` writes to the folder in **Settings → Advanced → Markdown/Obsidian vault**
+(default `data/vault`). Point it inside an Obsidian vault and everything JARVIS
+remembers becomes browsable and searchable there — in plain Markdown you own.
+
 ### Control
 `/listen` mic on · `/sleep` mic off · `/stop` stop speaking · `/status` component health ·
 `/clear` reset conversation · `/help` all commands

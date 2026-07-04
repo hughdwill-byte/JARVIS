@@ -61,6 +61,25 @@ Set a hard spending limit in the Anthropic console (Settings → Limits) — do 
 (The same settings exist as `LLM_MODEL_SMART`, `LLM_MODEL_DEEP`, `LLM_MAX_TOKENS`,
 `MEMORY_CONTEXT_TURNS`, and `VISION_MAX_IMAGE_EDGE` in `.env` if you prefer editing files.)
 
+## The cheapest setup: local-first (free everyday chat)
+
+If you install [Ollama](https://ollama.com) and pull a small model
+(`ollama pull qwen3:8b`), you can set **Settings → AI Brain → Brain source →
+`local_first`**. Then:
+
+- **Everyday chat runs on your own computer — $0, and fully private.**
+- The cloud (your Claude API key) is used *only* for hard questions, desk
+  vision, documents, and agent tasks — the places quality actually matters.
+
+This typically drops a "$5–10/month" API bill toward **$0–3/month**, because the
+bulk of casual turns never leave your machine. Pick `ollama` (no cloud at all)
+for chat if you want to spend nothing and stay fully offline — vision and agent
+tasks then simply tell you they need the cloud.
+
+**See what it's costing you any time:** type `/usage` — it lists calls, tokens,
+and estimated dollars per model for today, the last 7 days, and the last 30.
+(Local Ollama calls show as free.)
+
 ## Already paying for Claude Pro? Use it as the brain
 
 If you have a Claude Pro/Max subscription, JARVIS can bill usage to it instead of (or as
