@@ -34,7 +34,7 @@ covers **local-first mode** — free everyday chat on your own computer via
 On a computer with [Python 3.10+](https://python.org) and [Git](https://git-scm.com) installed:
 
 ```bash
-git clone <this-repo-url> JARVIS && cd JARVIS
+git clone https://github.com/hughdwill-byte/JARVIS.git JARVIS && cd JARVIS
 python3 -m venv .venv
 source .venv/bin/activate          # Windows PowerShell: .venv\Scripts\activate
 pip install -r requirements.txt
@@ -50,6 +50,51 @@ git pull
 pip install -r requirements.txt
 python run_app.py
 ```
+
+### Get the movie-JARVIS upgrade (local-first, voice, /ask, proactive)
+
+The newest features — free local chat via Ollama, natural Piper voice, `/ask`
+over your own notes, proactive nudges, cost tracking — live on the
+`jarvis-movie-local-first-upgrade` branch ([PR #3](https://github.com/hughdwill-byte/JARVIS/pull/3)).
+
+**Fresh install of that branch:**
+
+```bash
+git clone -b jarvis-movie-local-first-upgrade https://github.com/hughdwill-byte/JARVIS.git JARVIS
+cd JARVIS
+python3 -m venv .venv
+source .venv/bin/activate          # Windows PowerShell: .venv\Scripts\activate
+pip install -r requirements.txt
+python run_app.py
+```
+
+**Already cloned? Switch to it and update:**
+
+```bash
+cd ~/JARVIS
+source .venv/bin/activate
+git stash                          # park any local edits
+git fetch origin
+git checkout jarvis-movie-local-first-upgrade
+git pull origin jarvis-movie-local-first-upgrade
+pip install -r requirements.txt
+python run_app.py
+```
+
+**Optional — turn on free, private local mode** (install
+[Ollama](https://ollama.com) first, then):
+
+```bash
+ollama pull qwen3:8b               # the local chat model
+ollama pull nomic-embed-text       # enables /ask over your notes & vault
+# optional: install Piper for a natural offline voice — https://github.com/rhasspy/piper
+```
+
+Then, inside the app: **Settings → AI Brain → Brain source → `local_first`** →
+Save & Apply. Everyday chat now runs on your computer for free; the cloud is used
+only for hard questions, vision, documents and tasks. New commands to try:
+`good morning`, `/ask …`, `/usage`, `/checkin`, `/voicestats`, `/audit`
+(full list in [docs/USER_GUIDE.md](docs/USER_GUIDE.md)).
 Then, **inside the app**:
 
 1. Click **Settings** (top-left).
