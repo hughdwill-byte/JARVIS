@@ -28,14 +28,14 @@ class Preferences:
         return f"Remembered — \"{key}\": {value}. Use /forget {key} to remove it."
 
     def list_text(self) -> str:
-        rows = self.db.list_preferences()
+        rows = self.db.list_user_preferences()
         if not rows:
             return "I haven't stored any long-term memories. Use /remember <fact> to add one."
         lines = [f"- {r['key']}: {r['value']}" for r in rows]
         return "Things you've asked me to remember:\n" + "\n".join(lines)
 
     def as_context(self, limit: int = 10) -> list[str]:
-        return [f"{r['key']}: {r['value']}" for r in self.db.list_preferences()[:limit]]
+        return [f"{r['key']}: {r['value']}" for r in self.db.list_user_preferences()[:limit]]
 
     def forget(self, key: str) -> str:
         key = key.strip()

@@ -195,6 +195,25 @@ SETTINGS_SCHEMA: list[dict] = [
         ],
     },
     {
+        "section": "Proactive assistant",
+        "blurb": "JARVIS can volunteer things worth knowing — like tasks that have "
+                 "been open too long — without being asked. These limits keep it "
+                 "helpful, never naggy. Say /checkin any time to ask on demand.",
+        "items": [
+            {"key": "PROACTIVE_ENABLED", "label": "Proactive nudges", "type": "toggle",
+             "help": "Off = JARVIS only speaks when spoken to (except reminders you set)."},
+            {"key": "DO_NOT_DISTURB", "label": "Do Not Disturb", "type": "toggle",
+             "help": "On = silence ALL volunteered messages now. Toggle by voice with "
+                     "/dnd. /checkin still works when you ask directly."},
+            {"key": "STALE_TASK_DAYS", "label": "Flag tasks open longer than (days)",
+             "type": "number", "min": 1, "max": 90,
+             "help": "A task still open after this many days gets a gentle 'still on this?'"},
+            {"key": "NOTIFY_BUDGET", "label": "Max nudges per check", "type": "number",
+             "min": 1, "max": 10,
+             "help": "Caps how many things it raises at once, so it's never a wall of text."},
+        ],
+    },
+    {
         "section": "Advanced",
         "blurb": "You rarely need to touch these.",
         "items": [

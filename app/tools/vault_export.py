@@ -27,7 +27,7 @@ def export_vault(db: Database, vault_dir: Path) -> str:
     notes_md += [f"- **{_day(r['created_at'])}** — {r['content']}" for r in notes] or ["*(none)*"]
     (out / "Notes.md").write_text("\n".join(notes_md) + "\n", encoding="utf-8")
 
-    prefs = db.list_preferences()
+    prefs = db.list_user_preferences()
     mem_md = ["# Memories", "", "Long-term facts JARVIS was asked to remember.", ""]
     mem_md += [f"- **{r['key']}**: {r['value']}" for r in prefs] or ["*(none)*"]
     (out / "Memories.md").write_text("\n".join(mem_md) + "\n", encoding="utf-8")

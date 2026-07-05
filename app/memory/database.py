@@ -64,6 +64,14 @@ CREATE TABLE IF NOT EXISTS knowledge (
     content TEXT NOT NULL,
     embedding TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS tool_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at TEXT NOT NULL,
+    tool TEXT NOT NULL,
+    description TEXT NOT NULL,
+    outcome TEXT NOT NULL,
+    detail TEXT
+);
 CREATE TABLE IF NOT EXISTS llm_usage (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     created_at TEXT NOT NULL,
@@ -79,6 +87,11 @@ CREATE TABLE IF NOT EXISTS llm_usage (
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+# Preference keys JARVIS uses internally (settings-like state), never shown as
+# user "memories" or exported/indexed. Keep this list in one place.
+INTERNAL_PREFERENCE_KEYS = frozenset({"reply_style", "proactive_last_run"})
 
 
 class Database:
@@ -104,6 +117,20 @@ class Database:
     def _query(self, sql: str, params: tuple = ()) -> list[sqlite3.Row]:
         with self._lock:
             return self._conn.execute(sql, params).fetchall()
+
+    # --- tool audit log -------------------------------------------
+    def add_audit(self, tool: str, description: str, outcome: str,
+                  detail: str = "") -> None:
+        self._execute(
+            "INSERT INTO tool_audit (created_at, tool, description, outcome, detail) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (_now(), tool, description, outcome, detail),
+        )
+
+    def recent_audit(self, limit: int = 20) -> list[sqlite3.Row]:
+        return self._query(
+            "SELECT * FROM tool_audit ORDER BY id DESC LIMIT ?", (limit,)
+        )
 
     # --- knowledge (RAG embedding index) --------------------------
     def clear_knowledge(self) -> None:
@@ -213,7 +240,14 @@ class Database:
         return rows[0]["value"] if rows else None
 
     def list_preferences(self) -> list[sqlite3.Row]:
+        """All preferences, including JARVIS's internal state."""
         return self._query("SELECT * FROM preferences ORDER BY key")
+
+    def list_user_preferences(self) -> list[sqlite3.Row]:
+        """Only the user's own memories — excludes internal settings state.
+        Use this for anything the user sees, exports, or the model reads."""
+        return [r for r in self.list_preferences()
+                if r["key"] not in INTERNAL_PREFERENCE_KEYS]
 
     def delete_preference(self, key: str) -> bool:
         return self._execute(
