@@ -82,9 +82,35 @@ class KnowledgeBase:
         """Yield (source_label, ref, text) for everything indexable."""
         for r in self.db.list_notes(limit=10_000):
             yield ("note", f"note #{r['id']}", r["content"])
-        for r in self.db.list_preferences():
+        for r in self.db.list_user_preferences():
             yield ("memory", r["key"], f"{r['key']}: {r['value']}")
         yield from self._gather_vault()
+        yield from self._gather_docs()
+
+    def _gather_docs(self):
+        """Ingested documents (PDFs, text) copied into the docs folder by /doc."""
+        docs = Path(self.cfg.docs_dir)
+        if not docs.exists():
+            return
+        # extract_text handles PDF (via pypdf) and plain text; imported lazily
+        # so a machine without pypdf can still index notes/vault.
+        from app.tools.documents import extract_text
+        count = 0
+        for path in sorted(docs.rglob("*")):
+            if count >= _MAX_VAULT_FILES or not path.is_file():
+                continue
+            if path.suffix.lower() not in (".pdf", ".txt", ".md", ".markdown"):
+                continue
+            try:
+                if path.stat().st_size > _MAX_FILE_BYTES:
+                    continue
+                text = extract_text(path)
+            except Exception as exc:
+                log.warning("Skipping doc %s: %s", path.name, exc)
+                continue
+            if text and text.strip():
+                count += 1
+                yield ("document", path.name, text)
 
     def _gather_vault(self):
         vault = Path(self.cfg.obsidian_vault).expanduser()

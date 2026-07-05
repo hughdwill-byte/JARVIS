@@ -212,13 +212,29 @@ Markdown straight into the vault folder — then `/index` again.
 | Command | Purpose |
 |---|---|
 | `good morning` / `/briefing` | Spoken daily briefing: date, open tasks, due items, reminders, latest note |
-| `/ask …` | Answer from YOUR notes/memories/vault, with citations |
-| `/index` | (Re)build the searchable index of your notes & vault |
+| `/ask …` | Answer from YOUR notes/memories/vault/documents, with citations |
+| `/index` | (Re)build the searchable index of your notes, vault & ingested docs |
+| `/checkin` | "Anything I should know?" — flags stale tasks and the like, on demand |
+| `/dnd` | Toggle Do Not Disturb — silence proactive nudges (`/checkin` still works) |
 | `/usage` | What JARVIS has cost you — calls, tokens, estimated $ (today / 7 days / 30 days) |
 | `/voicestats` | Voice speed — speech-to-text and text-to-speech timing (recent) |
 | `/audit` | What JARVIS did on your computer/apps — every tool action, newest first |
 | `/brief` · `/detailed` | Switch between short spoken replies and full detailed ones |
 | `/export` | Write your notes, memories and tasks to a Markdown/Obsidian vault |
+
+**Proactive, not pushy.** JARVIS can volunteer things worth knowing — like a task
+that's been open more than a week — while it's idle. It's capped (a few items at
+most, at most once an hour) and you're in control: **Settings → Proactive
+assistant** tunes it, and `/dnd` silences it instantly. `/ask` and `/index` now
+also cover any PDFs or documents you've loaded with `/doc`, not just notes.
+
+### On your phone
+
+Open the dashboard address in Safari or Chrome on your phone and choose **Add to
+Home Screen** — JARVIS installs as an app-like icon (it ships a PWA manifest).
+For automation, `GET /api/jarvis` returns a read-only snapshot (status, tasks,
+agenda, spend, recent actions, things needing attention) that an iOS Shortcut can
+call — the building block for a "Hey Siri, ask JARVIS" flow.
 
 **On privacy:** every action JARVIS takes on your computer or connected apps is
 recorded in `/audit` (with any keys, tokens or email addresses masked). The same

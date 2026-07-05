@@ -89,6 +89,11 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+# Preference keys JARVIS uses internally (settings-like state), never shown as
+# user "memories" or exported/indexed. Keep this list in one place.
+INTERNAL_PREFERENCE_KEYS = frozenset({"reply_style", "proactive_last_run"})
+
+
 class Database:
     def __init__(self, path: str | Path):
         self.path = Path(path)
@@ -235,7 +240,14 @@ class Database:
         return rows[0]["value"] if rows else None
 
     def list_preferences(self) -> list[sqlite3.Row]:
+        """All preferences, including JARVIS's internal state."""
         return self._query("SELECT * FROM preferences ORDER BY key")
+
+    def list_user_preferences(self) -> list[sqlite3.Row]:
+        """Only the user's own memories — excludes internal settings state.
+        Use this for anything the user sees, exports, or the model reads."""
+        return [r for r in self.list_preferences()
+                if r["key"] not in INTERNAL_PREFERENCE_KEYS]
 
     def delete_preference(self, key: str) -> bool:
         return self._execute(

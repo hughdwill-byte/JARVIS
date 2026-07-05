@@ -32,6 +32,7 @@ from app.prompts import build_context_block
 from app.tools.briefing import build_briefing
 from app.tools.code_helper import CodeHelper
 from app.tools.documents import DocumentTool
+from app.tools.proactive import ProactiveMonitor
 from app.tools.vault_export import export_vault
 from app.tools.project_files import ProjectTool
 from app.tools.reminders import ReminderManager
@@ -86,6 +87,7 @@ class Assistant:
         self.study = StudyTools(self.llm)
         self.code = CodeHelper(self.llm)
         self.knowledge = KnowledgeBase(cfg, self.db, self.llm)
+        self.proactive = ProactiveMonitor(cfg, self.db)
 
         # Hands-free mode: created here, started by the front-end (run_assistant).
         self.voice_loop = VoiceLoop(self) if cfg.wake_word_enabled else None
@@ -171,6 +173,8 @@ class Assistant:
         t.register("usage", "LLM spend: calls, tokens, estimated cost", lambda _: self.usage.summary_text(), speak_reply=False)
         t.register("voicestats", "voice latency: speech-to-text & TTS timing", lambda _: self.latency.summary_text(), speak_reply=False)
         t.register("audit", "what JARVIS did on your computer/apps (tool-call log)", lambda _: self.audit.summary_text(), speak_reply=False)
+        t.register("checkin", "anything I should know? (stale tasks, etc.)", lambda _: self.proactive.summary_text())
+        t.register("dnd", "toggle Do Not Disturb (silence proactive nudges)", self._cmd_dnd)
         t.register("brief", "short spoken replies from now on", lambda _: self._set_reply_style("brief"))
         t.register("detailed", "full detailed replies from now on", lambda _: self._set_reply_style("detailed"))
 
@@ -373,8 +377,68 @@ class Assistant:
             f"  Snapshot retention: {self.cfg.snapshot_retention_days} day(s)",
         ])
 
+    def dashboard_summary(self) -> dict:
+        """One JSON snapshot of JARVIS as a personal operating layer: status,
+        agenda, memory, spend, recent automations, and things needing attention.
+        Powers the /api/jarvis endpoint (and any future JARVIS dashboard view)."""
+        from datetime import datetime, timezone
+        vl = self.voice_loop
+        today = datetime.now(timezone.utc).replace(
+            hour=0, minute=0, second=0, microsecond=0).isoformat(timespec="seconds")
+        usage_rows = self.db.usage_since(today)
+        try:
+            attention = self.proactive.checkins(force=True)
+        except Exception:
+            attention = []
+        return {
+            "brain": self.llm.describe(),
+            "devices": {
+                "brain": self.llm.available,
+                "camera": self.camera.available,
+                "microphone": self.ptt.available and self.transcriber.available,
+                "voice_output": self.speaker.available,
+            },
+            "listening": bool(vl and vl.listening),
+            "tasks": {
+                "open": len(self.db.list_tasks()),
+                "titles": self.tasks.open_titles(5),
+            },
+            "reminders_pending": sum(1 for r in self.db.list_reminders() if not r["fired"]),
+            "memory": {
+                "notes": len(self.db.list_notes(limit=10_000)),
+                "long_term": len(self.db.list_user_preferences()),
+                "indexed_passages": self.db.knowledge_count(),
+            },
+            "spend_today": {
+                "calls": sum(r["calls"] for r in usage_rows),
+                "cost_usd": round(sum(r["cost_usd"] or 0 for r in usage_rows), 4),
+            },
+            "recent_actions": [r["description"] for r in self.db.recent_audit(5)],
+            "attention": attention,
+            "code_version": self.code_version(),
+        }
+
     def due_reminder_messages(self) -> list[str]:
-        return self.reminders.pop_due()
+        """Polled by the idle loops. Due reminders always fire; proactive
+        nudges are throttled, budgeted and silenced by Do Not Disturb."""
+        msgs = self.reminders.pop_due()
+        try:
+            msgs += self.proactive.checkins()
+        except Exception:
+            log.exception("Proactive check-in failed")
+        return msgs
+
+    def _cmd_dnd(self, _: str) -> str:
+        new = not self.cfg.do_not_disturb
+        self.cfg.do_not_disturb = new  # immediate effect this session
+        try:  # persist so it survives a restart
+            from app.dashboard.settings import update_env_file
+            update_env_file({"DO_NOT_DISTURB": "true" if new else "false"})
+        except Exception:
+            log.warning("Could not persist Do Not Disturb to .env")
+        return ("Do Not Disturb on — I'll stay quiet unless you ask (/checkin still works)."
+                if new else
+                "Do Not Disturb off — I'll flag things you should know again.")
 
     # --- activity feed (voice exchanges shown in the dashboard) -------------
     def record_activity(self, role: str, text: str) -> None:

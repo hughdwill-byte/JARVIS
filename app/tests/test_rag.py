@@ -98,6 +98,17 @@ def test_reindex_empty_is_friendly(tmp_path):
     assert "Nothing to index" in kb.reindex()
 
 
+def test_reindex_includes_ingested_documents(tmp_path):
+    kb, db = _kb(tmp_path)
+    docs = Path(kb.cfg.docs_dir)
+    docs.mkdir(parents=True, exist_ok=True)
+    (docs / "lecture.txt").write_text("resistor networks and thermo notes")
+    kb.reindex()
+    # the document chunk should be searchable like any other source
+    hits = kb.search("resistor")
+    assert any(src == "document" and "lecture.txt" == ref for _s, src, ref, _c in hits)
+
+
 def test_search_ranks_by_similarity(tmp_path):
     kb, db = _kb(tmp_path)
     db.add_note("thermo entropy and exam revision")

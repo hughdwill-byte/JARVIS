@@ -123,6 +123,13 @@ class Config:
     agent_allowed_dirs: str = "~"  # comma-separated folders the agent may touch
     mcp_config_path: Path = field(default_factory=lambda: PROJECT_ROOT / "mcp_servers.json")
 
+    # Proactive assistant ("you should know…" nudges)
+    proactive_enabled: bool = True
+    stale_task_days: int = 7        # open longer than this -> gently flagged
+    do_not_disturb: bool = False    # true = never volunteer anything unprompted
+    notify_budget: int = 3          # max proactive messages surfaced per check
+    proactive_interval_s: int = 3600  # min gap between automatic check-ins
+
     # Misc
     debug: bool = False
     projects_dir: Path | None = None
@@ -213,6 +220,11 @@ def load_config(env_file: str | os.PathLike | None = None) -> Config:
         agent_auto_approve=_bool(os.getenv("AGENT_AUTO_APPROVE"), False),
         agent_allowed_dirs=os.getenv("AGENT_ALLOWED_DIRS", "~").strip() or "~",
         mcp_config_path=Path(os.getenv("MCP_CONFIG_PATH", "").strip() or PROJECT_ROOT / "mcp_servers.json"),
+        proactive_enabled=_bool(os.getenv("PROACTIVE_ENABLED"), True),
+        stale_task_days=_int(os.getenv("STALE_TASK_DAYS"), 7),
+        do_not_disturb=_bool(os.getenv("DO_NOT_DISTURB"), False),
+        notify_budget=_int(os.getenv("NOTIFY_BUDGET"), 3),
+        proactive_interval_s=_int(os.getenv("PROACTIVE_INTERVAL_S"), 3600),
         debug=_bool(os.getenv("DEBUG"), False),
         projects_dir=Path(projects_dir_raw) if projects_dir_raw else None,
     )

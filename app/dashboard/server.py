@@ -95,6 +95,27 @@ def create_app(cfg: Config, assistant: Assistant | None = None,
             "reminders_due": b.due_reminder_messages(),
         })
 
+    @app.get("/api/jarvis")
+    def jarvis_summary():
+        """Aggregated 'operating layer' snapshot for a JARVIS dashboard view
+        and for phone/Shortcuts clients. Read-only."""
+        with lock:
+            return jsonify(bot().dashboard_summary())
+
+    @app.get("/manifest.webmanifest")
+    def manifest():
+        """Makes the dashboard an installable PWA (Add to Home Screen)."""
+        return jsonify({
+            "name": "JARVIS",
+            "short_name": "JARVIS",
+            "description": "Your personal AI assistant.",
+            "start_url": "/",
+            "display": "standalone",
+            "background_color": "#0b0f14",
+            "theme_color": "#0b0f14",
+            "icons": [],  # optional; add PNGs later for a home-screen glyph
+        })
+
     @app.get("/api/activity")
     def activity():
         since = request.args.get("since", 0, type=int)
