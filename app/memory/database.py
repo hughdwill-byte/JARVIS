@@ -64,6 +64,14 @@ CREATE TABLE IF NOT EXISTS knowledge (
     content TEXT NOT NULL,
     embedding TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS tool_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at TEXT NOT NULL,
+    tool TEXT NOT NULL,
+    description TEXT NOT NULL,
+    outcome TEXT NOT NULL,
+    detail TEXT
+);
 CREATE TABLE IF NOT EXISTS llm_usage (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     created_at TEXT NOT NULL,
@@ -104,6 +112,20 @@ class Database:
     def _query(self, sql: str, params: tuple = ()) -> list[sqlite3.Row]:
         with self._lock:
             return self._conn.execute(sql, params).fetchall()
+
+    # --- tool audit log -------------------------------------------
+    def add_audit(self, tool: str, description: str, outcome: str,
+                  detail: str = "") -> None:
+        self._execute(
+            "INSERT INTO tool_audit (created_at, tool, description, outcome, detail) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (_now(), tool, description, outcome, detail),
+        )
+
+    def recent_audit(self, limit: int = 20) -> list[sqlite3.Row]:
+        return self._query(
+            "SELECT * FROM tool_audit ORDER BY id DESC LIMIT ?", (limit,)
+        )
 
     # --- knowledge (RAG embedding index) --------------------------
     def clear_knowledge(self) -> None:

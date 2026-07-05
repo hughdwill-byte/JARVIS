@@ -26,6 +26,7 @@ import webbrowser
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
+from app.brain import security
 from app.brain.llm_client import (
     LLMClient,
     SentenceStreamer,
@@ -346,6 +347,7 @@ class Agent:
             result = "The user declined this action. Continue without it or wrap up."
             is_error = True
             actions.append(f"(declined) {desc}")
+            security.record_tool_call(name, desc, "declined")
         else:
             on_action(f"  [agent] {desc}")
             try:
@@ -354,11 +356,14 @@ class Agent:
                 else:
                     result = self.tools.execute(name, args)
                 actions.append(desc)
+                security.record_tool_call(name, desc, "executed")
             except ToolError as exc:
                 result, is_error = str(exc), True
+                security.record_tool_call(name, desc, "error", str(exc))
             except Exception as exc:
                 log.exception("Agent tool %s crashed", name)
                 result, is_error = f"Tool failed: {exc}", True
+                security.record_tool_call(name, desc, "error", str(exc))
         return {"type": "tool_result", "tool_use_id": block.id,
                 "content": result[:OUTPUT_CAP], "is_error": is_error}
 

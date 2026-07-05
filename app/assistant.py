@@ -20,6 +20,7 @@ from app.brain.llm_client import create_llm_client
 from app.brain.mcp_client import MCPManager
 from app.brain.rag import KnowledgeBase
 from app.brain.router import Router, looks_like_computer_task
+from app.brain.security import AuditLog, set_audit
 from app.brain.tool_manager import ToolManager
 from app.brain.usage import UsageTracker, set_tracker
 from app.config import Config
@@ -67,6 +68,8 @@ class Assistant:
         set_tracker(self.usage)  # every LLM call logs tokens/cost from here on
         self.latency = LatencyLog()
         set_log(self.latency)    # STT + TTS timings feed /voicestats
+        self.audit = AuditLog(self.db)
+        set_audit(self.audit)    # every agent tool call is recorded (redacted)
         self.llm = create_llm_client(cfg)
         self.speaker = Speaker(cfg)
         self.transcriber = Transcriber(cfg)
@@ -167,6 +170,7 @@ class Assistant:
         t.register("status", "show device/API status", lambda _: self.status_text(), speak_reply=False)
         t.register("usage", "LLM spend: calls, tokens, estimated cost", lambda _: self.usage.summary_text(), speak_reply=False)
         t.register("voicestats", "voice latency: speech-to-text & TTS timing", lambda _: self.latency.summary_text(), speak_reply=False)
+        t.register("audit", "what JARVIS did on your computer/apps (tool-call log)", lambda _: self.audit.summary_text(), speak_reply=False)
         t.register("brief", "short spoken replies from now on", lambda _: self._set_reply_style("brief"))
         t.register("detailed", "full detailed replies from now on", lambda _: self._set_reply_style("detailed"))
 

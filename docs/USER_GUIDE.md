@@ -216,8 +216,14 @@ Markdown straight into the vault folder — then `/index` again.
 | `/index` | (Re)build the searchable index of your notes & vault |
 | `/usage` | What JARVIS has cost you — calls, tokens, estimated $ (today / 7 days / 30 days) |
 | `/voicestats` | Voice speed — speech-to-text and text-to-speech timing (recent) |
+| `/audit` | What JARVIS did on your computer/apps — every tool action, newest first |
 | `/brief` · `/detailed` | Switch between short spoken replies and full detailed ones |
 | `/export` | Write your notes, memories and tasks to a Markdown/Obsidian vault |
+
+**On privacy:** every action JARVIS takes on your computer or connected apps is
+recorded in `/audit` (with any keys, tokens or email addresses masked). The same
+masking runs on all log files, so a stray API key or email address never lands in
+a plaintext log — handy if you ever share logs while troubleshooting.
 
 `/export` writes to the folder in **Settings → Advanced → Markdown/Obsidian vault**
 (default `data/vault`). Point it inside an Obsidian vault and everything JARVIS
