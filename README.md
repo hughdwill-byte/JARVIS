@@ -34,7 +34,7 @@ covers **local-first mode** — free everyday chat on your own computer via
 On a computer with [Python 3.10+](https://python.org) and [Git](https://git-scm.com) installed:
 
 ```bash
-git clone <this-repo-url> JARVIS && cd JARVIS
+git clone https://github.com/hughdwill-byte/JARVIS JARVIS && cd JARVIS
 python3 -m venv .venv
 source .venv/bin/activate          # Windows PowerShell: .venv\Scripts\activate
 pip install -r requirements.txt
