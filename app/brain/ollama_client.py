@@ -21,7 +21,12 @@ import urllib.error
 import urllib.request
 
 from app.brain import usage
-from app.brain.llm_client import LLMClient, _pick_model
+from app.brain.llm_client import (
+    LLMClient,
+    _pick_model,
+    looks_unanswered,
+    needs_current_info,
+)
 from app.config import Config
 from app.logger import get_logger
 from app.prompts import SYSTEM_PROMPT, current_datetime_line
@@ -189,10 +194,13 @@ class LocalFirstClient:
         return self.cfg.ollama_model
 
     def _wants_cloud(self, user_text: str, force_smart: bool) -> bool:
-        """Cloud when the request earned the smart/deep tier AND a key exists."""
+        """Cloud when the request earned the smart/deep tier, needs current info
+        (the cloud can web-search), or there's no local server — AND a key exists."""
         if not self.api.available:
             return False
         if not self.ollama.available:
+            return True
+        if needs_current_info(user_text):
             return True
         cloud_model = _pick_model(self.cfg, user_text, force_smart)
         return cloud_model != self.cfg.llm_model_fast
@@ -200,16 +208,28 @@ class LocalFirstClient:
     def chat(self, user_text: str, history: list[dict] | None = None,
              context_block: str = "", force_smart: bool = False,
              max_tokens: int | None = None) -> str:
-        if self._wants_cloud(user_text, force_smart):
-            return self.api.chat(user_text, history=history, context_block=context_block,
-                                 force_smart=force_smart, max_tokens=max_tokens)
-        if self.ollama.available:
-            return self.ollama.chat(user_text, history=history,
-                                    context_block=context_block,
-                                    force_smart=force_smart, max_tokens=max_tokens)
-        # no local server: the API path answers (or explains the missing key)
-        return self.api.chat(user_text, history=history, context_block=context_block,
-                             force_smart=force_smart, max_tokens=max_tokens)
+        wants_cloud = self._wants_cloud(user_text, force_smart)
+        # First attempt: cloud if the request earned it (hard/deep/current) or
+        # there's no local server; otherwise the free local model.
+        if wants_cloud or not self.ollama.available:
+            reply = self.api.chat(user_text, history=history, context_block=context_block,
+                                  force_smart=force_smart, max_tokens=max_tokens)
+        else:
+            reply = self.ollama.chat(user_text, history=history,
+                                     context_block=context_block,
+                                     force_smart=force_smart, max_tokens=max_tokens)
+        # Escalation net: if the answer still punts ("no real-time access",
+        # "knowledge cutoff") and we haven't already used the best cloud tier,
+        # retry on the cloud with the smart model + web search so the user gets
+        # a real answer no matter which brain took the first pass.
+        already_best = wants_cloud and force_smart
+        if self.api.available and not already_best and looks_unanswered(reply):
+            log.info("Answer looked incomplete; escalating to the cloud (smart + web search).")
+            better = self.api.chat(user_text, history=history, context_block=context_block,
+                                   force_smart=True, max_tokens=max_tokens)
+            if better and not looks_unanswered(better):
+                return better
+        return reply
 
     def analyze_image(self, image_b64: str, media_type: str, prompt: str) -> str:
         if self.api.available:

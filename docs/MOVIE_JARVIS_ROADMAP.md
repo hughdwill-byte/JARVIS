@@ -188,6 +188,8 @@ runs, and explicit deep reports).
 | Request type | Routed to | Why |
 |---|---|---|
 | Everyday chat, quick Qs | **Local** (Ollama qwen3:8b) | free, private, fast enough |
+| Needs current facts ("who won last night", "weather today", "latest…") | Cloud + **web search** | local model has no web / fixed cutoff |
+| Local model *punts* ("no real-time access", "knowledge cutoff") | Auto-escalates to Cloud smart + web search | so you get an answer no matter which brain answered first |
 | Hard / long / "debug"/"refactor" | Cloud **sonnet** | quality matters |
 | "in-depth report", "use opus" | Cloud **opus** | explicit, worth it |
 | Desk vision, document Q&A | Cloud (force_smart) | local vision weak/absent |

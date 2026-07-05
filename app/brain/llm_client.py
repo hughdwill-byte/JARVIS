@@ -55,6 +55,50 @@ _DEEP_HINTS = (
     "thorough analysis", "thorough report", "detailed report", "full report",
     "use opus", "your best model", "the big model",
 )
+
+# Questions that need up-to-the-minute facts a local model can't have (no web,
+# fixed knowledge cutoff). In local_first these are routed to the CLOUD, which
+# can web-search and actually answer them.
+_FRESH_HINTS = (
+    "last night", "yesterday", "today", "tonight", "this morning",
+    "this afternoon", "this evening", "this week", "this weekend",
+    "right now", "currently", "at the moment", "latest", "recent",
+    "just happened", "breaking", "as of", "so far this",
+    "who won", "who is winning", "who's winning", "final score", "the score",
+    "scores", "fixture", "results", "standings", "leaderboard",
+    "news", "headline", "weather", "forecast",
+    "price of", "stock price", "share price", "exchange rate",
+    "how much is", "what time", "is it open", "opening hours",
+    "world cup", "premier league", "election", "who is the current",
+    "who's the current", "release date", "came out",
+)
+
+# Signs the model punted because it lacks current info / web access. Triggers a
+# cloud retry so the user still gets a real answer.
+_PUNT_PHRASES = (
+    "real-time", "real time information", "realtime",
+    "knowledge cutoff", "knowledge cut-off", "knowledge cut off",
+    "as of my last", "as of my knowledge", "as of my training", "my last update",
+    "don't have access to", "do not have access to", "no access to",
+    "can't browse", "cannot browse", "can't access the internet",
+    "unable to access", "not able to access", "can't provide real",
+    "cannot provide real", "don't have current", "don't have real-time",
+    "don't have the latest", "up-to-date information", "up to date information",
+    "beyond my training", "after my training", "browse the internet",
+    "i cannot look", "i can't look up", "check a live", "check the latest",
+)
+
+
+def needs_current_info(text: str) -> bool:
+    """True if the question likely needs current facts the local model can't have."""
+    low = text.lower()
+    return any(h in low for h in _FRESH_HINTS)
+
+
+def looks_unanswered(reply: str) -> bool:
+    """True if a reply reads like the model gave up for lack of current info."""
+    low = (reply or "").lower()
+    return any(p in low for p in _PUNT_PHRASES)
 # Deep work usually means long output; 1024 tokens would truncate a report.
 DEEP_MAX_TOKENS = 8192
 

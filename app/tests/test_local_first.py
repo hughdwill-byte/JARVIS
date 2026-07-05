@@ -7,6 +7,7 @@ import time
 import pytest
 
 from app.assistant import Assistant
+from app.brain.llm_client import looks_unanswered, needs_current_info
 from app.brain.ollama_client import LocalFirstClient, OllamaClient, _strip_think
 from app.brain.usage import UsageTracker, estimate_cost
 from app.config import Config
@@ -75,6 +76,75 @@ def test_local_first_chat_dispatch(lf_cfg):
 
 def test_local_first_raw_is_none_so_chat_never_rides_cloud_tool_loop(lf_cfg):
     assert LocalFirstClient(lf_cfg).raw is None
+
+
+# --- current-info escalation (get an answer no matter which brain) ------------
+
+def test_needs_current_info_detection():
+    assert needs_current_info("who played in the world cup last night")
+    assert needs_current_info("what's the weather today")
+    assert needs_current_info("latest news on the election")
+    assert needs_current_info("what's the current price of a Pi 5")
+    assert needs_current_info("who won the match")
+    assert not needs_current_info("explain how photosynthesis works")
+    assert not needs_current_info("write a poem about the sea")
+
+
+def test_looks_unanswered_detection():
+    assert looks_unanswered("I don't have access to real-time information.")
+    assert looks_unanswered("As of my knowledge cutoff, I can't say.")
+    assert looks_unanswered("I cannot browse the internet to check the latest scores.")
+    assert not looks_unanswered("City beat United 2-1 at the death.")
+    assert not looks_unanswered("")
+
+
+def test_current_info_question_routes_straight_to_cloud(lf_cfg):
+    lf = LocalFirstClient(lf_cfg)
+    _force_ollama(lf.ollama, True)
+    calls = {"local": 0, "cloud": 0}
+    lf.ollama.chat = lambda *a, **k: (calls.__setitem__("local", calls["local"] + 1), "LOCAL")[1]
+    lf.api.chat = lambda *a, **k: (calls.__setitem__("cloud", calls["cloud"] + 1), "CLOUD web result")[1]
+    out = lf.chat("who played in the world cup last night")
+    assert out == "CLOUD web result"
+    assert calls["cloud"] == 1 and calls["local"] == 0  # never wasted a local call
+
+
+def test_local_punt_escalates_to_cloud(lf_cfg):
+    lf = LocalFirstClient(lf_cfg)
+    _force_ollama(lf.ollama, True)
+    seen = {}
+    lf.ollama.chat = lambda *a, **k: "I don't have access to real-time information."
+    def cloud(user_text, history=None, context_block="", force_smart=False, max_tokens=None):
+        seen["force_smart"] = force_smart
+        return "United won 3-0."
+    lf.api.chat = cloud
+    # a phrasing with no current-info keywords, so it hits the local model first;
+    # the local model punts, which should trigger the cloud escalation
+    out = lf.chat("how are the reds getting on")
+    assert out == "United won 3-0."
+    assert seen["force_smart"] is True  # escalation uses the best cloud shot
+
+
+def test_good_local_answer_is_not_escalated(lf_cfg):
+    lf = LocalFirstClient(lf_cfg)
+    _force_ollama(lf.ollama, True)
+    cloud_calls = {"n": 0}
+    lf.ollama.chat = lambda *a, **k: "Photosynthesis converts light into chemical energy."
+    lf.api.chat = lambda *a, **k: (cloud_calls.__setitem__("n", cloud_calls["n"] + 1), "X")[1]
+    out = lf.chat("explain photosynthesis")
+    assert "Photosynthesis" in out
+    assert cloud_calls["n"] == 0  # stayed local & free, no needless cloud call
+
+
+def test_no_escalation_without_api_key(tmp_path):
+    cfg = Config(llm_provider="local_first", anthropic_api_key="",
+                 database_path=tmp_path / "t.db", mcp_config_path=tmp_path / "m.json")
+    lf = LocalFirstClient(cfg)
+    _force_ollama(lf.ollama, True)
+    lf.ollama.chat = lambda *a, **k: "I don't have access to real-time information."
+    # no key -> can't escalate; returns the honest local reply rather than crashing
+    out = lf.chat("who won last night")
+    assert "real-time" in out
 
 
 # --- Ollama client ------------------------------------------------------------

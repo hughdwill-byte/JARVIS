@@ -175,6 +175,15 @@ Keep your Claude API key in Settings — local-first uses it only when a request
 is worth the cloud. Want *everything* offline? Pick `ollama` instead (chat only;
 vision and agent tasks need the cloud). See [`COST_CONTROL.md`](COST_CONTROL.md).
 
+**You always get an answer.** The local model has no internet and a fixed
+knowledge cutoff, so on `local_first` JARVIS automatically sends anything that
+needs *current* facts — "who won the match last night", "what's the weather
+today", "latest news on…" — to the cloud, which searches the web and answers.
+And if the local model ever replies with "I don't have real-time access" to
+something the keywords missed, JARVIS quietly retries on the cloud so you still
+get a real answer. (Each of these uses one small cloud call; everything else
+stays local and free.)
+
 ### A more natural voice (Piper)
 
 The default voice (`pyttsx3`) is free and instant but robotic. For a warm,
