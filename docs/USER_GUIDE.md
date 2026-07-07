@@ -180,13 +180,19 @@ vision and agent tasks need the cloud). See [`COST_CONTROL.md`](COST_CONTROL.md)
 The default voice (`pyttsx3`) is free and instant but robotic. Two free,
 **entirely offline** upgrades — pick whichever is easier for you.
 
-**Kokoro (recommended — one `pip install`, no files to download by hand):**
+**Kokoro (recommended — no files to download by hand):**
 
-1. `pip install kokoro` (pulls in a neural TTS model; it's a large download,
-   done once).
-2. **Settings → Speaker & Voice output → Voice engine → `auto`** (use Kokoro
+1. Install the `espeak-ng` system binary first (Kokoro's text-to-phoneme step
+   needs it): macOS `brew install espeak-ng`; Debian/Ubuntu/Raspberry Pi
+   `sudo apt-get install espeak-ng`; Windows: the installer from the
+   [espeak-ng releases page](https://github.com/espeak-ng/espeak-ng/releases).
+2. `pip install "kokoro>=0.9.4" soundfile` (pulls in a neural TTS model; it's a
+   large download, done once). **The version pin matters** — a bare
+   `pip install kokoro` can resolve to an unrelated older package of the same
+   name and silently give you the wrong thing.
+3. **Settings → Speaker & Voice output → Voice engine → `auto`** (use Kokoro
    whenever it's installed) or **`kokoro`** (always use it).
-3. Pick a **Kokoro voice** from the dropdown (`af_heart` is a good default;
+4. Pick a **Kokoro voice** from the dropdown (`af_heart` is a good default;
    `af_*` American female, `am_*` American male, `bf_*`/`bm_*` British).
    Save & Apply. The first spoken reply downloads the voice model, then it's
    fully offline. The speaking-speed slider maps onto Kokoro's pace.

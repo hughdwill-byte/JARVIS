@@ -96,7 +96,7 @@ study workflows and PDF/project features, is **[docs/USER_GUIDE.md](docs/USER_GU
 
 - **Talk hands-free** — local wake-word detection ("jarvis"), local speech-to-text, offline
   text-to-speech; `/stop` interrupts it mid-sentence. Optional **Kokoro** neural voice for a
-  natural, still-free, still-offline upgrade (`pip install kokoro`, then Settings → Voice
+  natural, still-free, still-offline upgrade (see *Nicer voice* below, then Settings → Voice
   engine).
 - **See your desk** — `/desk` describe, `/look where are my keys?`, `/read` a held-up page,
   `/ocr` free local text reading, `/changes` what moved since last time.
@@ -207,11 +207,15 @@ no speaker, and no API key.
 ## What's next after setup
 
 1. Live with it for a week; tune wake sensitivity and voice speed in Settings.
-2. **Nicer voice (free, local, offline):** `pip install kokoro`, then open Settings →
-   Speaker & Voice output and set **Voice engine** to `auto` (or `kokoro`) and pick a
-   **Kokoro voice**. It's a big quality jump over the robotic OS voice; if the package
-   isn't installed JARVIS just keeps using the system voice, so there's no risk. (Piper is
-   still supported too, and `pip install edge-tts` remains an option for Microsoft's online
+2. **Nicer voice (free, local, offline):** install `espeak-ng` (macOS:
+   `brew install espeak-ng`; Debian/Ubuntu/Pi: `sudo apt-get install espeak-ng`; Windows:
+   the installer from the [espeak-ng releases page](https://github.com/espeak-ng/espeak-ng/releases)),
+   then `pip install "kokoro>=0.9.4" soundfile` (the version pin matters — a bare
+   `pip install kokoro` can grab an unrelated older package of the same name). Open
+   Settings → Speaker & Voice output, set **Voice engine** to `auto` (or `kokoro`), and
+   pick a **Kokoro voice**. It's a big quality jump over the robotic OS voice; if it isn't
+   installed JARVIS just keeps using the system voice, so there's no risk. (Piper is still
+   supported too, and `pip install edge-tts` remains an option for Microsoft's online
    voices — see [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#tts-sounds-robotic).)
 3. Bigger ideas: calendar integration, web search tool, a dedicated mini-PC or Pi so JARVIS
    is always on ([setup/setup_raspberry_pi.md](setup/setup_raspberry_pi.md)).
@@ -248,9 +252,7 @@ stack was added; parity was confirmed and it was left as-is.
 
 ## License
 
-> **TODO (owner):** This repository does not yet have its own `LICENSE` file — please choose
-> a project license. The code adapted from OpenJarvis is Apache-2.0, which is compatible with
-> most choices (MIT, BSD, Apache-2.0 itself, and the GPL family) **as long as the notices in
-> [`NOTICE`](NOTICE) and [`LICENSES/Apache-2.0.txt`](LICENSES/Apache-2.0.txt) and the adapted
-> files' headers are preserved.** Until you pick one, no overall license is granted for this
-> repository. (This note is a placeholder for you to action — I didn't choose a license for you.)
+This is a personal project with no public license — all rights reserved to the owner. The
+portions adapted from OpenJarvis remain Apache-2.0 regardless (see [`NOTICE`](NOTICE) and
+[`LICENSES/Apache-2.0.txt`](LICENSES/Apache-2.0.txt) for the required attribution), but that
+doesn't change the licensing status of the rest of the repository.

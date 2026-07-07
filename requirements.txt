@@ -24,9 +24,15 @@ faster-whisper>=1.0.0     # local Whisper STT (CPU-friendly "base"/"small" model
 # installed JARVIS falls back to the system voice, so this is safe to skip.
 # Backend adapted from OpenJarvis (Apache-2.0); see NOTICE and README.
 # Left commented (like edge-tts below) because it pulls in torch — a large
-# download that would bloat every install (including Raspberry Pi). Enable with
-# a plain `pip install kokoro`; playback reuses sounddevice/numpy, already above.
-# kokoro>=0.9.0           # local neural text-to-speech (downloads torch + a voice model)
+# download that would bloat every install (including Raspberry Pi). To enable:
+#   1) install the espeak-ng system binary first (Kokoro's phonemizer needs
+#      it): macOS `brew install espeak-ng`; Debian/Ubuntu/Pi
+#      `sudo apt-get install espeak-ng`; Windows: the espeak-ng installer from
+#      https://github.com/espeak-ng/espeak-ng/releases
+#   2) pip install "kokoro>=0.9.4" soundfile
+#      (the version pin matters — plain `pip install kokoro` can resolve to an
+#      unrelated older package of the same name)
+# kokoro>=0.9.4           # local neural text-to-speech (downloads torch + a voice model)
 
 # --- Hands-free wake word ("jarvis") ---
 openwakeword>=0.6.0       # local wake-word detection

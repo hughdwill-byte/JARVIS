@@ -96,12 +96,19 @@ steps. (Newer JARVIS versions detect this and print these instructions automatic
 ## TTS sounds robotic
 - It is — pyttsx3 is the free offline engine. Adjust the speaking-speed slider in
   **Settings → Speaker & Voice output** (160–190 is most natural).
-- **Best free upgrade (local + offline): Kokoro neural voice.** Run `pip install kokoro`,
-  then set **Settings → Speaker & Voice output → Voice engine** to `auto` (use Kokoro when
+- **Best free upgrade (local + offline): Kokoro neural voice.** Install `espeak-ng` first
+  (macOS `brew install espeak-ng`; Debian/Ubuntu/Pi `sudo apt-get install espeak-ng`;
+  Windows: the [espeak-ng installer](https://github.com/espeak-ng/espeak-ng/releases)),
+  then `pip install "kokoro>=0.9.4" soundfile` — the version pin matters, a bare
+  `pip install kokoro` can grab an unrelated older package of the same name. Then set
+  **Settings → Speaker & Voice output → Voice engine** to `auto` (use Kokoro when
   available) or `kokoro` (force it), and pick a **Kokoro voice**. First use downloads the
   model once; after that it's fully offline and free. If the package isn't installed JARVIS
   keeps using the system voice — turning it on can never make JARVIS go mute. The speaking-
   speed slider maps onto Kokoro's pace too.
+- If `pip install kokoro` reports success but JARVIS still can't find it (or you get an
+  `ImportError: cannot import name 'KPipeline'`), you likely got the wrong package — run
+  `pip uninstall kokoro` then reinstall with the version pin above.
 - Also offline: **Piper** (see the User Guide) — a `.onnx` voice you download once.
 - Online free option: `pip install edge-tts` (Microsoft neural voices, needs internet).
 - Paid (ElevenLabs) only if voice quality really matters to you.
