@@ -96,8 +96,14 @@ steps. (Newer JARVIS versions detect this and print these instructions automatic
 ## TTS sounds robotic
 - It is — pyttsx3 is the free offline engine. Adjust the speaking-speed slider in
   **Settings → Speaker & Voice output** (160–190 is most natural).
-- Free upgrade: `pip install edge-tts` (Microsoft neural voices, needs internet) — swap the
-  provider in `app/audio/text_to_speech.py`'s `speak()`; the class structure already isolates it.
+- **Best free upgrade (local + offline): Kokoro neural voice.** Run `pip install kokoro`,
+  then set **Settings → Speaker & Voice output → Voice engine** to `auto` (use Kokoro when
+  available) or `kokoro` (force it), and pick a **Kokoro voice**. First use downloads the
+  model once; after that it's fully offline and free. If the package isn't installed JARVIS
+  keeps using the system voice — turning it on can never make JARVIS go mute. The speaking-
+  speed slider maps onto Kokoro's pace too.
+- Also offline: **Piper** (see the User Guide) — a `.onnx` voice you download once.
+- Online free option: `pip install edge-tts` (Microsoft neural voices, needs internet).
 - Paid (ElevenLabs) only if voice quality really matters to you.
 
 ## Raspberry Pi performance

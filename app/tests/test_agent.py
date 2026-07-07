@@ -307,25 +307,45 @@ def test_agent_run_uses_deep_model_for_heavy_tasks(agent_cfg):
     """'/agent write an in-depth report...' runs on the deep model, start to finish."""
     cfg, ws = agent_cfg
     agent, client = _agent_with(cfg, [
+        # calls[0] = the up-front planning call (cheap smart model)
+        SimpleNamespace(content=[_text('["read draft A", "read draft B", "compare"]')],
+                        stop_reason="end_turn"),
         SimpleNamespace(content=[_tool_use("list_dir", {"path": str(ws)})],
                         stop_reason="tool_use"),
         SimpleNamespace(content=[_text("Report done.")], stop_reason="end_turn"),
     ])
     agent.run("write an in-depth report comparing my two project drafts")
-    assert client.calls[0]["model"] == cfg.llm_model_deep
-    # tool use must NOT downgrade the deep run to the smart model
+    # planning stays on the cheap smart model even for a deep task…
+    assert client.calls[0]["model"] == cfg.llm_model_smart
+    # …but the task loop itself runs on the deep model, start to finish
     assert client.calls[1]["model"] == cfg.llm_model_deep
+    # tool use must NOT downgrade the deep run to the smart model
+    assert client.calls[2]["model"] == cfg.llm_model_deep
     # and deep work gets a report-sized reply budget
     from app.brain.llm_client import DEEP_MAX_TOKENS
-    assert client.calls[0]["max_tokens"] == DEEP_MAX_TOKENS
+    assert client.calls[1]["max_tokens"] == DEEP_MAX_TOKENS
 
 
 def test_agent_run_uses_smart_model_for_ordinary_tasks(agent_cfg):
     cfg, _ws = agent_cfg
     agent, client = _agent_with(cfg, [
+        SimpleNamespace(content=[_text('["open the folder"]')], stop_reason="end_turn"),
         SimpleNamespace(content=[_text("Done.")], stop_reason="end_turn"),
     ])
     agent.run("tidy my workspace folder")
+    assert client.calls[0]["model"] == cfg.llm_model_smart  # planning
+    assert client.calls[1]["model"] == cfg.llm_model_smart  # task loop
+
+
+def test_agent_run_without_planning_skips_the_plan_call(agent_cfg):
+    """AGENT_PLANNING=false → no up-front plan call, straight into the loop."""
+    cfg, _ws = agent_cfg
+    cfg.agent_planning = False
+    agent, client = _agent_with(cfg, [
+        SimpleNamespace(content=[_text("Done.")], stop_reason="end_turn"),
+    ])
+    agent.run("tidy my workspace folder")
+    assert len(client.calls) == 1
     assert client.calls[0]["model"] == cfg.llm_model_smart
 
 

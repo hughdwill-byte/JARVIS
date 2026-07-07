@@ -12,6 +12,7 @@ import re
 import shutil
 from pathlib import Path
 
+from app.audio.kokoro_tts import AVAILABLE_VOICES as KOKORO_VOICES
 from app.config import PROJECT_ROOT
 from app.logger import get_logger
 
@@ -129,11 +130,26 @@ SETTINGS_SCHEMA: list[dict] = [
              "source": "speaker_devices",
              "help": "System default follows your OS sound settings; pick a specific "
                      "device to lock JARVIS to it."},
-            {"key": "TTS_PROVIDER", "label": "Voice output", "type": "select",
+            {"key": "TTS_ENGINE", "label": "Voice engine", "type": "select",
+             "choices": ["auto", "kokoro", "system"],
+             "help": "auto = use the Kokoro neural voice if it's installed, else the "
+                     "system voice below (recommended). kokoro = force the free local "
+                     "Kokoro neural voice (much more natural; one-time `pip install "
+                     "kokoro`). system = only the pyttsx3/piper voice below. If Kokoro "
+                     "isn't installed, JARVIS quietly falls back to the system voice — "
+                     "it can never go mute."},
+            {"key": "KOKORO_VOICE", "label": "Kokoro voice", "type": "select",
+             "choices": KOKORO_VOICES,
+             "help": "Which Kokoro neural voice to use (only applies when Voice engine "
+                     "is auto/kokoro). 'af_' voices are American female, 'am_' male, "
+                     "'bf_'/'bm_' British. af_heart is a good default."},
+            {"key": "TTS_PROVIDER", "label": "System voice (fallback)", "type": "select",
              "choices": ["pyttsx3", "piper", "none"],
-             "help": "pyttsx3 = free offline OS voice (robotic but zero setup). "
+             "help": "The voice used when Kokoro is off or unavailable. "
+                     "pyttsx3 = free offline OS voice (robotic but zero setup). "
                      "piper = natural offline neural voice (needs the piper binary + "
-                     "a downloaded .onnx voice; set it below). none = text-only. "
+                     "a downloaded .onnx voice; set it below). none = text-only "
+                     "(disables all speech, including Kokoro). "
                      "If piper isn't set up, JARVIS quietly falls back to the OS voice."},
             {"key": "PIPER_VOICE_MODEL", "label": "Piper voice model (.onnx)", "type": "text",
              "help": "Only for the 'piper' voice. Full path to a downloaded voice file, "

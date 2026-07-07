@@ -34,6 +34,7 @@ from app.brain.llm_client import (
     record_api_usage,
     web_search_tool,
 )
+from app.brain.planning import compact_messages, plan_steps
 from app.config import Config
 from app.logger import get_logger
 from app.prompts import (
@@ -237,9 +238,23 @@ class Agent:
         if not self.llm.available:
             return ("Agent mode needs the LLM — add your Anthropic API key in "
                     "Settings -> AI Brain and press Save & Apply.")
+        # Plan -> act: decompose the task into a short ordered plan first, then
+        # work through it. Cheap (one smart-model call), best-effort, and hands
+        # the model a scaffold that keeps long multi-step tasks on track.
+        # (Pattern adapted from OpenJarvis — see app/brain/planning.py.)
+        dynamic = current_datetime_line()
+        if self.cfg.agent_planning:
+            steps = plan_steps(self.llm, task, self.cfg.llm_model_smart)
+            if steps:
+                on_action("  [agent] plan:")
+                for i, step in enumerate(steps, 1):
+                    on_action(f"    {i}. {step}")
+                plan_text = "\n".join(f"{i}. {s}" for i, s in enumerate(steps, 1))
+                dynamic += ("\n\n--- YOUR PLAN ---\nWork through these steps, adapting as "
+                            "you learn. Don't narrate the plan back to the user.\n" + plan_text)
         final, actions = self._loop(
             messages=[{"role": "user", "content": task}],
-            system=cached_system(AGENT_SYSTEM_PROMPT, current_datetime_line()),
+            system=cached_system(AGENT_SYSTEM_PROMPT, dynamic),
             # Smart model floor; a deep-hinted task ("in-depth report") gets
             # the deep model instead.
             model=self.llm.pick_model(task, force_smart=True),
@@ -285,6 +300,12 @@ class Agent:
 
         can_stream = on_sentence is not None and hasattr(client.messages, "stream")
         for _step in range(self.cfg.agent_max_steps):
+            # Keep long multi-step runs inside the context window: compact stale
+            # tool observations once the transcript grows past the budget. A
+            # no-op on ordinary short turns. (Pattern adapted from OpenJarvis —
+            # see app/brain/planning.py.)
+            messages = compact_messages(
+                messages, cap_tokens=self.cfg.agent_context_cap_tokens)
             # Deep work (reports) needs room to write; everyday steps stay capped.
             max_tokens = max_tokens_for(self.cfg, model, 2048)
             started = time.monotonic()

@@ -13,7 +13,8 @@ finished playing. Getting that "actually finished" right is the whole trick:
 - A specific output device (SPEAKER_DEVICE_INDEX) is honoured by rendering to
   a file and playing it through sounddevice+soundfile (sd.wait() blocks).
 
-Fallback chain never crashes: preferred path -> pyttsx3 -> text-only.
+Fallback chain never crashes: Kokoro (neural, if enabled+installed) ->
+piper -> macOS `say`/pyttsx3 -> text-only.
 """
 
 from __future__ import annotations
@@ -60,8 +61,25 @@ class Speaker:
                         "using the OS voice instead. Install piper "
                         "(https://github.com/rhasspy/piper) to get the natural voice.",
                         cfg.piper_binary)
-        # Only require pyttsx3 as a fallback when neither `say` nor piper is available.
-        if self._enabled and not self._say and not self._piper:
+        # Kokoro: local neural voice, tried FIRST in the fallback chain when
+        # enabled. Only offered when speaking is enabled at all and the engine
+        # setting allows it; if the package is missing we quietly fall through
+        # to piper/the OS voice (never mute). Adapted from OpenJarvis — see
+        # app/audio/kokoro_tts.py.
+        self._kokoro = None
+        self._kokoro_warned = False
+        if self._enabled and cfg.tts_engine in ("auto", "kokoro"):
+            from app.audio.kokoro_tts import KokoroTTS
+            if KokoroTTS.available():
+                self._kokoro = KokoroTTS()
+            elif cfg.tts_engine == "kokoro":
+                log.warning("TTS_ENGINE=kokoro but the 'kokoro' package isn't installed — "
+                            "using the OS voice instead. pip install kokoro to get the "
+                            "natural neural voice.")
+        # Only require pyttsx3 as a fallback when no other backend (say / piper /
+        # kokoro) can speak — otherwise a box with Kokoro but no pyttsx3 would be
+        # wrongly muted.
+        if self._enabled and not self._say and not self._piper and not self._kokoro:
             try:
                 import pyttsx3  # noqa: F401  (probe; engines are per-utterance)
             except ImportError:
@@ -166,7 +184,11 @@ class Speaker:
 
     # --- playback backends --------------------------------------------------------
     def _play(self, text: str) -> None:
-        # Piper handles its own device routing, so it goes first.
+        # Kokoro (neural) goes first when enabled; on any failure it returns
+        # False and we fall through to the existing piper/OS-voice chain.
+        if self._kokoro is not None and self._play_kokoro(text):
+            return
+        # Piper handles its own device routing, so it goes next.
         if self._piper and self._play_piper(text):
             return
         if self.cfg.speaker_device_index is not None and self._play_routed(text):
@@ -175,6 +197,46 @@ class Speaker:
             self._play_macos_say(text)
         else:
             self._play_pyttsx3(text)
+
+    def _kokoro_speed(self) -> float:
+        """Map the words-per-minute rate slider onto Kokoro's speed multiplier
+        (1.0 = the model's natural pace, tuned around ~180 wpm)."""
+        speed = self.cfg.tts_rate / 180.0
+        return max(0.5, min(2.0, speed))
+
+    def _play_kokoro(self, text: str) -> bool:
+        """Synthesise with Kokoro and play on the selected output device.
+        Returns False on any problem so the caller falls back to the OS voice."""
+        try:
+            import sounddevice as sd
+        except ImportError:
+            if not self._kokoro_warned:
+                log.warning("Kokoro playback needs: pip install sounddevice")
+                self._kokoro_warned = True
+            return False
+        try:
+            started = time.monotonic()
+            samples, rate = self._kokoro.synthesize(
+                text, voice=self.cfg.kokoro_voice or "af_heart", speed=self._kokoro_speed())
+            if self._skip.is_set():
+                return True  # stop() fired mid-synth — nothing to play
+            if samples is None or len(samples) == 0:
+                return False
+            latency.record("tts", (time.monotonic() - started) * 1000)
+            sd.play(samples, rate, device=self.cfg.speaker_device_index)
+            sd.wait()
+            return True
+        except ImportError:
+            if not self._kokoro_warned:
+                log.warning("TTS_ENGINE wants Kokoro but the 'kokoro' package isn't "
+                            "installed — using the OS voice. pip install kokoro")
+                self._kokoro_warned = True
+            self._kokoro = None  # stop retrying this session
+            return False
+        except Exception as exc:
+            log.error("Kokoro synthesis/playback failed (%s); using OS voice", exc)
+            self._kokoro = None  # stop retrying this session
+            return False
 
     def _play_piper(self, text: str) -> bool:
         """Synthesise with Piper (natural neural voice) and play the WAV.

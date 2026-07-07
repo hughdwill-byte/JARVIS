@@ -175,21 +175,37 @@ Keep your Claude API key in Settings — local-first uses it only when a request
 is worth the cloud. Want *everything* offline? Pick `ollama` instead (chat only;
 vision and agent tasks need the cloud). See [`COST_CONTROL.md`](COST_CONTROL.md).
 
-### A more natural voice (Piper)
+### A more natural voice
 
-The default voice (`pyttsx3`) is free and instant but robotic. For a warm,
-natural voice that still runs **entirely offline**, switch to **Piper**:
+The default voice (`pyttsx3`) is free and instant but robotic. Two free,
+**entirely offline** upgrades — pick whichever is easier for you.
+
+**Kokoro (recommended — one `pip install`, no files to download by hand):**
+
+1. `pip install kokoro` (pulls in a neural TTS model; it's a large download,
+   done once).
+2. **Settings → Speaker & Voice output → Voice engine → `auto`** (use Kokoro
+   whenever it's installed) or **`kokoro`** (always use it).
+3. Pick a **Kokoro voice** from the dropdown (`af_heart` is a good default;
+   `af_*` American female, `am_*` American male, `bf_*`/`bm_*` British).
+   Save & Apply. The first spoken reply downloads the voice model, then it's
+   fully offline. The speaking-speed slider maps onto Kokoro's pace.
+
+**Piper (a single binary + a voice file you download):**
 
 1. Install piper — see [github.com/rhasspy/piper](https://github.com/rhasspy/piper)
    (a single binary; put it on your PATH).
 2. Download a voice, e.g. `en_US-lessac-medium` — you need **both** the `.onnx`
    and its `.onnx.json`, in the same folder.
-3. **Settings → Speaker & Voice output → Voice output → `piper`**, then paste the
-   full path to the `.onnx` file into **Piper voice model**. Save & Apply.
+3. **Settings → Speaker & Voice output → System voice (fallback) → `piper`**,
+   then paste the full path to the `.onnx` file into **Piper voice model**.
+   Save & Apply.
 
-If piper or the model isn't found, JARVIS quietly uses the OS voice — turning
-this on can never leave you with a mute assistant. Curious how fast the voice
-pipeline is? Type `/voicestats` for speech-to-text and synthesis timings.
+Either way, if the upgrade isn't installed or set up, JARVIS quietly falls back
+to the OS voice — turning it on can never leave you with a mute assistant.
+(Setting **System voice** to `none` disables *all* speech, Kokoro included.)
+Curious how fast the voice pipeline is? Type `/voicestats` for speech-to-text
+and synthesis timings.
 
 ### Ask your own notes (`/ask`) — private, cited search
 
@@ -241,8 +257,9 @@ English. The important ones:
 - **Microphone & Speech** — pick your mic *by name*. If JARVIS hears you badly, check you
   selected the desk speakerphone, not the laptop's built-in mic.
 - **Hands-free wake word** — on/off toggle and the sensitivity slider.
-- **Speaker & Voice output** — pick the output device, set speaking speed (160–190 feels
-  most natural).
+- **Speaker & Voice output** — pick the output device and set speaking speed (160–190 feels
+  most natural). **Voice engine** chooses the neural Kokoro voice (`auto`/`kokoro`) or the
+  plain system voice; see *A more natural voice* above for the one-time `pip install kokoro`.
 - **Camera & Vision** — *Scan for cameras* finds what's plugged in; *Test camera* shows you
   exactly what JARVIS sees (use this to aim the camera). Also: how many days snapshots are
   kept (0 = delete right after analysis).

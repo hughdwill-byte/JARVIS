@@ -1,0 +1,64 @@
+JARVIS — Desk Assistant
+Third-party attribution notices
+
+================================================================================
+OpenJarvis (Apache License 2.0)
+================================================================================
+
+Portions of this project are adapted from OpenJarvis:
+
+    https://github.com/open-jarvis/OpenJarvis
+    Copyright 2025 The OpenJarvis Authors
+    Licensed under the Apache License, Version 2.0
+
+A verbatim copy of the Apache License 2.0 is included at:
+
+    LICENSES/Apache-2.0.txt
+
+The Apache-2.0 license requires that this NOTICE be retained and that files
+carrying adapted code identify their origin. Each adapted file also carries a
+short header comment pointing back to the original.
+
+--------------------------------------------------------------------------------
+1) Directly adapted (code)
+--------------------------------------------------------------------------------
+
+  app/audio/kokoro_tts.py
+      Kokoro local neural TTS backend. Adapted from OpenJarvis
+      src/openjarvis/speech/kokoro_tts.py
+      https://github.com/open-jarvis/OpenJarvis/blob/main/src/openjarvis/speech/kokoro_tts.py
+      Changes: removed OpenJarvis's TTSRegistry decorator and TTSBackend/TTSResult
+      abstraction; the pipeline is lazily import-guarded; synthesis returns raw
+      float32 samples (played by app/audio/text_to_speech.py through sounddevice)
+      instead of encoded audio bytes.
+
+--------------------------------------------------------------------------------
+2) Patterns adapted (reimplemented — no code copied)
+--------------------------------------------------------------------------------
+
+  app/brain/planning.py
+      Compact, self-contained reimplementation of three ideas from OpenJarvis.
+      No source code was copied; only the approaches were studied.
+        - Explicit up-front task decomposition before acting, inspired by
+          src/openjarvis/agents/manager.py and src/openjarvis/agents/executor.py
+        - Defensive JSON-or-lines parsing of model output that never raises,
+          inspired by src/openjarvis/memory/extractor.py (FactExtractor)
+        - Token-budget context compaction that elides stale tool observations,
+          inspired by src/openjarvis/agents/hybrid/mini_swe_agent.py
+          (_estimate_prompt_tokens and _compact_local_messages)
+
+  app/brain/agent.py (partial)
+      The plan -> select-tool -> act -> observe loop with a step budget and the
+      context-compaction hook are pattern-inspired by the OpenJarvis agent files
+      above. JARVIS's own safety model (AGENT_ALLOWED_DIRS allowlist, per-action
+      approval prompts, untrusted-content handling) is unchanged.
+
+================================================================================
+Notes
+================================================================================
+
+- Speech-to-text (app/audio/speech_to_text.py) uses faster-whisper, the same
+  engine OpenJarvis wraps. No OpenJarvis code was used; parity was confirmed and
+  no second STT stack was added.
+- The paid/cloud TTS/STT backends OpenJarvis also ships (Cartesia, Deepgram,
+  OpenAI) were deliberately NOT adapted — JARVIS stays local and free.
