@@ -93,6 +93,14 @@ Uses [`@softeria/ms-365-mcp-server`](https://github.com/softeria/ms-365-mcp-serv
 4. Restart JARVIS, then `/apps` should list `outlook`. Try: `/agent check my Outlook inbox
    for anything from my tutor this week`.
 
+**Trimming a connector to just the tools you want.** Any server entry in
+`mcp_servers.json` can take an optional `"allowedTools"` list — JARVIS then exposes only
+those tools out of everything the server offers. Fewer tools means less token cost on every
+turn and no surprise capabilities. The example's `outlook` entry ships with a 14-tool
+allowlist (core mail/calendar/contacts); delete the `"allowedTools"` line to get the full
+preset back. Names are matched loosely (case and `-`/`_` don't matter), and if one matches
+nothing JARVIS logs a warning so you can spot a typo.
+
 ### Canvas LMS
 
 Uses [`@r-huijts/canvas-mcp`](https://github.com/r-huijts/canvas-mcp) (courses,

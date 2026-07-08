@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import threading
 from pathlib import Path
 
@@ -67,6 +68,25 @@ def sanitize_input_schema(schema: object) -> dict:
     return cleaned
 
 
+def _normalize_tool_name(name: str) -> str:
+    """Lowercase and strip separators so 'get-mail-message', 'get_mail_message'
+    and 'GetMailMessage' all compare equal — config names needn't be exact."""
+    return re.sub(r"[^a-z0-9]", "", str(name).lower())
+
+
+def tool_is_allowed(tool_name: str, allowed: list[str]) -> bool:
+    """Whether a bare MCP tool name passes a server's optional allowlist.
+
+    An empty allowlist means "allow everything" (the default). Matching ignores
+    case and -/_ differences so a connector that renames create_draft ->
+    create-draft still matches a config that lists either spelling.
+    """
+    if not allowed:
+        return True
+    target = _normalize_tool_name(tool_name)
+    return any(_normalize_tool_name(a) == target for a in allowed)
+
+
 def load_mcp_config(path: Path) -> dict[str, dict]:
     """Parse mcp_servers.json -> {server_name: {command, args, env}}.
 
@@ -86,10 +106,16 @@ def load_mcp_config(path: Path) -> dict[str, dict]:
     for name, spec in servers.items():
         if not isinstance(spec, dict) or "command" not in spec:
             raise ValueError(f"Server '{name}' needs at least a \"command\" field.")
+        # Optional per-server allowlist: keep only these tools out of everything
+        # the server exposes (fewer tools = less token overhead per turn and no
+        # surprise capabilities). Ignored if absent/empty. JARVIS-specific key,
+        # harmlessly ignored by other MCP clients.
+        allowed = spec.get("allowedTools", [])
         cleaned[name] = {
             "command": spec["command"],
             "args": spec.get("args", []),
             "env": spec.get("env", {}),
+            "allowed_tools": [str(a) for a in allowed] if isinstance(allowed, list) else [],
         }
     return cleaned
 
@@ -162,7 +188,12 @@ class MCPManager:
         await session.initialize()
         result = await session.list_tools()
         self._sessions[name] = (session, stack)
+        allowed = spec.get("allowed_tools") or []
+        matched: set[str] = set()
         for tool in result.tools:
+            if not tool_is_allowed(tool.name, allowed):
+                continue
+            matched.add(_normalize_tool_name(tool.name))
             self._tools.append({
                 "name": f"{name}{NAME_SEP}{tool.name}",
                 "description": f"[{name} app] {tool.description or tool.name}"[:1024],
@@ -171,6 +202,12 @@ class MCPManager:
                 # and which 400s the whole turn. Normalise before sending.
                 "input_schema": sanitize_input_schema(tool.inputSchema),
             })
+        if allowed:
+            unmatched = [a for a in allowed if _normalize_tool_name(a) not in matched]
+            if unmatched:
+                log.warning("MCP server '%s': %d allowedTools name(s) matched no tool "
+                            "(check spelling): %s", name, len(unmatched),
+                            ", ".join(unmatched))
 
     # --- use -------------------------------------------------------------------
     def tool_schemas(self) -> list[dict]:

@@ -6,7 +6,13 @@ the entire turn. Real connectors (Microsoft 365 / Graph, Canvas) ship such
 tools, so MCP schemas must be normalised before they're sent.
 """
 
-from app.brain.mcp_client import sanitize_input_schema
+import json
+
+from app.brain.mcp_client import (
+    load_mcp_config,
+    sanitize_input_schema,
+    tool_is_allowed,
+)
 
 
 def test_wellformed_object_schema_passes_through_untouched():
@@ -71,3 +77,45 @@ def test_nested_combinators_are_left_alone():
     out = sanitize_input_schema(schema)
     assert out is schema
     assert "anyOf" in out["properties"]["body"]
+
+
+# --- per-server tool allowlist -----------------------------------------------
+
+def test_empty_allowlist_allows_everything():
+    assert tool_is_allowed("send-mail", []) is True
+    assert tool_is_allowed("anything", []) is True
+
+
+def test_allowlist_matches_listed_tools_only():
+    allowed = ["list-mail-messages", "send-mail"]
+    assert tool_is_allowed("list-mail-messages", allowed) is True
+    assert tool_is_allowed("send-mail", allowed) is True
+    assert tool_is_allowed("delete-mail-message", allowed) is False
+
+
+def test_allowlist_matching_ignores_case_and_separators():
+    allowed = ["get_mail_message"]
+    assert tool_is_allowed("get-mail-message", allowed) is True
+    assert tool_is_allowed("GetMailMessage", allowed) is True
+    # but a genuinely different name still doesn't match
+    assert tool_is_allowed("list-mail-messages", allowed) is False
+
+
+def test_load_mcp_config_parses_allowed_tools(tmp_path):
+    p = tmp_path / "mcp.json"
+    p.write_text(json.dumps({"mcpServers": {
+        "outlook": {"command": "npx", "args": ["-y", "x"],
+                    "allowedTools": ["send-mail", "get-mail-message"]},
+        "canvas": {"command": "npx", "args": []},  # no allowlist
+    }}))
+    servers = load_mcp_config(p)
+    assert servers["outlook"]["allowed_tools"] == ["send-mail", "get-mail-message"]
+    assert servers["canvas"]["allowed_tools"] == []  # absent -> allow all
+
+
+def test_load_mcp_config_ignores_non_list_allowed_tools(tmp_path):
+    p = tmp_path / "mcp.json"
+    p.write_text(json.dumps({"mcpServers": {
+        "x": {"command": "npx", "allowedTools": "send-mail"},  # wrong type
+    }}))
+    assert load_mcp_config(p)["x"]["allowed_tools"] == []

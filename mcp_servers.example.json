@@ -23,7 +23,15 @@
     "outlook": {
       "command": "npx",
       "args": ["-y", "@softeria/ms-365-mcp-server", "--preset", "outlook"],
-      "_note": "Microsoft Graph: mail, calendar, contacts. First run: `npx @softeria/ms-365-mcp-server --login` in a terminal for the one-time device-code sign-in. University/work account? Add '--org-mode' to both this args list and the --login command. '--preset outlook' keeps the tool count sane (~dozens); avoid '--preset all' (200+ tools) unless you need Excel/OneNote/Teams too — every extra tool costs context on every turn. docs/COMPUTER_AND_APPS.md has the full walkthrough."
+      "allowedTools": [
+        "list-mail-messages", "get-mail-message", "send-mail",
+        "create-draft-email", "delete-mail-message",
+        "list-calendar-events", "get-calendar-event", "create-calendar-event",
+        "update-calendar-event", "delete-calendar-event",
+        "get-outlook-contact", "create-outlook-contact",
+        "update-outlook-contact", "delete-outlook-contact"
+      ],
+      "_note": "Microsoft Graph: mail, calendar, contacts. First run: `npx @softeria/ms-365-mcp-server --login` in a terminal for the one-time device-code sign-in. University/work account? Add '--org-mode' to both this args list and the --login command. The optional 'allowedTools' list above trims the connector down to just these tools (fewer tools = less token cost per turn + no surprise actions) — delete the whole 'allowedTools' line to get the full preset back. docs/COMPUTER_AND_APPS.md has the full walkthrough."
     },
 
     "canvas": {
