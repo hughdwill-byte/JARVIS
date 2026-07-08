@@ -34,6 +34,49 @@ STALE_AFTER_S = 10.0   # no state update this long => assume the app quit, exit
 POLL_MS = 150
 
 
+def make_click_through(root) -> bool:
+    """Let mouse clicks pass straight THROUGH the pill to whatever's beneath, so
+    it can never block you. Returns True if it took effect. Best-effort and
+    platform-specific; on failure the pill still shows (just not click-through).
+    """
+    if sys.platform == "darwin":
+        try:
+            from AppKit import NSApp  # ships with PyObjC (a pywebview dependency)
+            root.update_idletasks()
+            app = NSApp()
+            if app is None:
+                return False
+            ok = False
+            for win in app.windows():
+                try:
+                    win.setIgnoresMouseEvents_(True)
+                    ok = True
+                except Exception:
+                    pass
+            return ok
+        except Exception as exc:
+            print(f"status overlay: click-through unavailable on macOS ({exc}); the "
+                  "pill may block clicks. Fix: pip install pyobjc-framework-Cocoa",
+                  file=sys.stderr)
+            return False
+    if sys.platform.startswith("win"):
+        try:
+            import ctypes
+            GWL_EXSTYLE, WS_EX_LAYERED, WS_EX_TRANSPARENT, WS_EX_TOOLWINDOW = \
+                -20, 0x80000, 0x20, 0x80
+            u = ctypes.windll.user32
+            hwnd = u.GetParent(root.winfo_id()) or root.winfo_id()
+            style = u.GetWindowLongW(hwnd, GWL_EXSTYLE)
+            u.SetWindowLongW(hwnd, GWL_EXSTYLE,
+                             style | WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW)
+            return True
+        except Exception as exc:
+            print(f"status overlay: click-through unavailable on Windows ({exc})",
+                  file=sys.stderr)
+            return False
+    return False  # Linux/other: not supported; pill still shows
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--state-file", help="JSON file the app writes its state to")
@@ -64,6 +107,8 @@ def main(argv: list[str] | None = None) -> int:
                      fg="white", padx=16, pady=8)
     label.pack()
 
+    applied = {"click_through": False}
+
     def show(state: str) -> None:
         look = _LOOK.get(state)
         if look is None:                 # idle / unknown -> hide the pill
@@ -74,9 +119,13 @@ def main(argv: list[str] | None = None) -> int:
         root.configure(bg=colour)
         root.deiconify()
         root.update_idletasks()
+        # Apply click-through once the window actually exists (needs a realized
+        # native window). Retry each show until it takes.
+        if not applied["click_through"]:
+            applied["click_through"] = make_click_through(root)
         w = root.winfo_width()
         sw = root.winfo_screenwidth()
-        root.geometry(f"+{sw - w - 24}+28")
+        root.geometry(f"+{sw - w - 24}+44")   # top-right, below the menu bar
         root.lift()                      # macOS: make sure it comes to the front
         root.attributes("-topmost", True)
 
