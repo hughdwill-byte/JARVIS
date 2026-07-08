@@ -36,9 +36,9 @@ On a computer with [Python 3.10+](https://python.org) and [Git](https://git-scm.
 ```bash
 git clone https://github.com/hughdwill-byte/JARVIS JARVIS && cd JARVIS
 python3 -m venv .venv
-source .venv/bin/activate          # Windows PowerShell: .venv\Scripts\activate
+source .venv/bin/activate          
 pip install -r requirements.txt
-python run_app.py                  # opens the JARVIS desktop app
+python run_app.py                   
 ```
 To just launch an updated version after updates launch:
 
@@ -50,6 +50,12 @@ git pull
 pip install -r requirements.txt
 python run_app.py
 ```
+Another Launch Method
+
+```bash
+source .venv/bin/activate && python run_app.py
+```
+
 Then, **inside the app**:
 
 1. Click **Settings** (top-left).
