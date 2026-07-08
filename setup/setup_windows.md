@@ -56,4 +56,16 @@ paste the API key, and press **Save & Apply** — no file editing needed.
 The native window uses Windows' built-in WebView2 (already present on Windows 10/11);
 if it's somehow missing, JARVIS opens in your browser instead — same app.
 
+## Optional: the "JARVIS is working" light
+
+Want a visible cue when JARVIS is listening / thinking / speaking, without a window
+in your way? Turn on **Settings → Speaker & Voice output → Menu-bar status light**
+(one-time `pip install pystray`). On Windows it appears as a small coloured dot in the
+**system tray** (bottom-right, by the clock): green = listening, amber = thinking,
+blue = speaking; it hides when idle and never covers your screen or blocks clicks.
+
+Windows 11 hides *new* tray icons in the "⌃" overflow flyout by default. To keep the
+dot always visible, drag it from that flyout onto the taskbar (or **Settings →
+Personalization → Taskbar → Other system tray icons** and turn it on).
+
 You're set up — day-to-day usage is covered in [`docs/USER_GUIDE.md`](../docs/USER_GUIDE.md).

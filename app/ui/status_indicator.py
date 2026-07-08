@@ -115,12 +115,18 @@ class StatusIndicator:
             log.debug("status write failed: %s", exc)
 
     def _launch_overlay(self) -> None:
+        # On Windows, stop a console window flashing up for the child process —
+        # that would itself be "interfering". No-op elsewhere.
+        extra = {}
+        if sys.platform.startswith("win"):
+            extra["creationflags"] = 0x08000000  # CREATE_NO_WINDOW
         try:
             self._proc = subprocess.Popen(
                 [sys.executable, "-m", "app.ui.status_overlay",
                  "--state-file", str(self._state_path)],
                 cwd=str(PROJECT_ROOT),
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                **extra,
             )
             log.info("Status overlay launched (pid %s)", self._proc.pid)
         except Exception as exc:
