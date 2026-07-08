@@ -29,6 +29,7 @@ import time
 from pathlib import Path
 
 from app.audio import latency
+from app.audio.speech_text import to_speech_text
 from app.config import Config
 from app.logger import get_logger
 
@@ -184,6 +185,12 @@ class Speaker:
 
     # --- playback backends --------------------------------------------------------
     def _play(self, text: str) -> None:
+        # Clean the text for the ear: strip markdown symbols and expand
+        # abbreviations ("e.g." -> "for example") so no engine reads them
+        # literally. Done once here so every backend benefits.
+        text = to_speech_text(text)
+        if not text:
+            return
         # Kokoro (neural) goes first when enabled; on any failure it returns
         # False and we fall through to the existing piper/OS-voice chain.
         if self._kokoro is not None and self._play_kokoro(text):

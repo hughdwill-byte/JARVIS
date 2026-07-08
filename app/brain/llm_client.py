@@ -60,6 +60,11 @@ DEEP_MAX_TOKENS = 8192
 
 
 _SENTENCE_END = re.compile(r"(?<=[.!?])[\s\n]+")
+# Segments ending in one of these are NOT a real sentence break — e.g. splitting
+# "...for example." after "e.g." would speak it as a stranded fragment. When a
+# segment ends this way we hold it and glue it onto the next one.
+_ABBREV_END = re.compile(
+    r"\b(?:e\.g|i\.e|a\.k\.a|approx|vs|etc|mr|mrs|dr|prof)\.?$", re.I)
 
 
 class SentenceStreamer:
@@ -72,11 +77,20 @@ class SentenceStreamer:
     def feed(self, delta: str) -> None:
         self._buf += delta
         parts = _SENTENCE_END.split(self._buf)
-        if len(parts) > 1:
-            for sentence in parts[:-1]:
-                if sentence.strip():
-                    self.emit(sentence.strip())
-            self._buf = parts[-1]
+        if len(parts) <= 1:
+            return
+        self._buf = parts[-1]
+        carry = ""
+        for seg in parts[:-1]:
+            seg = f"{carry} {seg}".strip() if carry else seg
+            if _ABBREV_END.search(seg):
+                carry = seg  # ends in an abbreviation -> keep building
+                continue
+            carry = ""
+            if seg.strip():
+                self.emit(seg.strip())
+        if carry:  # trailing abbreviation, no following sentence yet -> re-buffer
+            self._buf = f"{carry} {self._buf}".strip()
 
     def flush(self) -> None:
         if self._buf.strip():

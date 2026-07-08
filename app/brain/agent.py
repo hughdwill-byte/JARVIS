@@ -270,7 +270,7 @@ class Agent:
             model=self.llm.pick_model(task, force_smart=True),
             on_action=on_action,
         )
-        return self._with_action_log(final, actions)
+        return self._with_action_log(final, actions, self.cfg.agent_show_actions)
 
     def run_conversation(
         self,
@@ -394,8 +394,10 @@ class Agent:
                 "content": result[:OUTPUT_CAP], "is_error": is_error}
 
     @staticmethod
-    def _with_action_log(final: str, actions: list[str]) -> str:
+    def _with_action_log(final: str, actions: list[str], show: bool = True) -> str:
         if not actions:
             return final or "Done — nothing needed doing."
+        if not show:
+            return final or "Done."
         log_lines = "\n".join(f"  - {a}" for a in actions)
         return f"{final or 'Done.'}\n\nActions taken:\n{log_lines}"

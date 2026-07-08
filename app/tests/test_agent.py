@@ -343,6 +343,32 @@ def test_agent_run_uses_deep_model_for_heavy_tasks(agent_cfg):
     assert client.calls[1]["max_tokens"] == DEEP_MAX_TOKENS
 
 
+def test_agent_run_hides_action_log_when_disabled(agent_cfg):
+    cfg, ws = agent_cfg
+    cfg.agent_show_actions = False
+    agent, _client = _agent_with(cfg, [
+        SimpleNamespace(content=[_text('["look"]')], stop_reason="end_turn"),   # plan
+        SimpleNamespace(content=[_tool_use("list_dir", {"path": str(ws)})],
+                        stop_reason="tool_use"),
+        SimpleNamespace(content=[_text("All done.")], stop_reason="end_turn"),
+    ])
+    out = agent.run("tidy the folder")
+    assert "All done." in out
+    assert "Actions taken" not in out
+
+
+def test_agent_run_shows_action_log_by_default(agent_cfg):
+    cfg, ws = agent_cfg
+    agent, _client = _agent_with(cfg, [
+        SimpleNamespace(content=[_text('["look"]')], stop_reason="end_turn"),   # plan
+        SimpleNamespace(content=[_tool_use("list_dir", {"path": str(ws)})],
+                        stop_reason="tool_use"),
+        SimpleNamespace(content=[_text("All done.")], stop_reason="end_turn"),
+    ])
+    out = agent.run("tidy the folder")
+    assert "Actions taken" in out
+
+
 def test_agent_run_uses_smart_model_for_ordinary_tasks(agent_cfg):
     cfg, _ws = agent_cfg
     agent, client = _agent_with(cfg, [
@@ -446,10 +472,12 @@ def test_stop_preempts_without_the_lock(cfg):
 
 
 def test_agent_config_defaults(monkeypatch):
-    for var in ("AGENT_ENABLED", "AGENT_AUTO_APPROVE", "AGENT_ALLOWED_DIRS", "AGENT_MAX_STEPS"):
+    for var in ("AGENT_ENABLED", "AGENT_AUTO_APPROVE", "AGENT_ALLOWED_DIRS",
+                "AGENT_MAX_STEPS", "AGENT_SHOW_ACTIONS"):
         monkeypatch.delenv(var, raising=False)
     c = load_config(env_file="/nonexistent/.env")
     assert c.agent_enabled is True
     assert c.agent_auto_approve is False  # safe default: always ask
     assert c.agent_allowed_dirs == "~"
     assert c.agent_max_steps == 15
+    assert c.agent_show_actions is True

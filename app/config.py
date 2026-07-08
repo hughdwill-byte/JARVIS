@@ -130,6 +130,9 @@ class Config:
     agent_max_steps: int = 15
     agent_auto_approve: bool = False
     agent_allowed_dirs: str = "~"  # comma-separated folders the agent may touch
+    # Show the "Actions taken:" list appended to agent replies. Purely cosmetic
+    # (it's built locally and never spoken — costs no tokens); off = tidier.
+    agent_show_actions: bool = True
     # Explicit up-front task decomposition before a /agent task runs (a short
     # plan the model then works through). Patterns adapted from OpenJarvis.
     agent_planning: bool = True
@@ -230,6 +233,7 @@ def load_config(env_file: str | os.PathLike | None = None) -> Config:
         agent_max_steps=_int(os.getenv("AGENT_MAX_STEPS"), 15),
         agent_auto_approve=_bool(os.getenv("AGENT_AUTO_APPROVE"), False),
         agent_allowed_dirs=os.getenv("AGENT_ALLOWED_DIRS", "~").strip() or "~",
+        agent_show_actions=_bool(os.getenv("AGENT_SHOW_ACTIONS"), True),
         agent_planning=_bool(os.getenv("AGENT_PLANNING"), True),
         agent_context_cap_tokens=_int(os.getenv("AGENT_CONTEXT_CAP_TOKENS"), 12000),
         mcp_config_path=Path(os.getenv("MCP_CONFIG_PATH", "").strip() or PROJECT_ROOT / "mcp_servers.json"),

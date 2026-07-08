@@ -204,6 +204,10 @@ SETTINGS_SCHEMA: list[dict] = [
              "help": "Off (recommended): every file write, command, or email send asks you "
                      "first in the terminal. On: it just acts — required for agent tasks "
                      "started from this app window."},
+            {"key": "AGENT_SHOW_ACTIONS", "label": "Show 'Actions taken' list", "type": "toggle",
+             "help": "Appends a list of each tool action to agent replies. Purely cosmetic — "
+                     "it's built locally, never spoken, and costs no tokens. Turn off for "
+                     "tidier replies."},
             {"key": "AGENT_MAX_STEPS", "label": "Max steps per task", "type": "number",
              "min": 3, "max": 40,
              "help": "How many tool actions one /agent task may take. More = bigger tasks, "

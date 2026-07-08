@@ -463,7 +463,7 @@ class Assistant:
                 final, actions = self.llm.chat(user_text, history=history,
                                                context_block=context), []
             reply_text = final
-            if actions:
+            if actions and self.cfg.agent_show_actions:
                 reply_text += "\n\nActions taken:\n" + "\n".join(f"  - {a}" for a in actions)
                 speak_text = final  # don't read the action log aloud
         elif (self.cfg.agent_enabled and self.llm.available
