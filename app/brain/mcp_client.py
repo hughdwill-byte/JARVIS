@@ -35,6 +35,38 @@ def mcp_deps_ok() -> bool:
         return False
 
 
+def sanitize_input_schema(schema: object) -> dict:
+    """Make an MCP tool's JSON schema safe to send to the Anthropic API.
+
+    Anthropic requires each tool's ``input_schema`` to be a plain object schema
+    (``"type": "object"``) and rejects ``oneOf`` / ``allOf`` / ``anyOf`` — and
+    anything without a top-level object type — *at the top level* (nested ones
+    inside properties are fine). Real-world connectors (Microsoft 365 / Graph,
+    Canvas, …) ship tools whose top-level schema is a union, and a single one of
+    those makes the ENTIRE request 400, killing every tool call in the turn.
+
+    We coerce any such schema to a valid top-level object: keep its
+    ``properties`` / ``required`` if present, otherwise fall back to an
+    unconstrained object (the MCP server still validates arguments on its side).
+    Schemas that are already well-formed pass through untouched.
+    """
+    if not isinstance(schema, dict):
+        return {"type": "object", "properties": {}}
+    has_top_combinator = any(k in schema for k in ("oneOf", "allOf", "anyOf"))
+    if not has_top_combinator and schema.get("type") == "object":
+        return schema  # already valid — leave it alone
+    cleaned: dict = {"type": "object"}
+    props = schema.get("properties")
+    cleaned["properties"] = props if isinstance(props, dict) else {}
+    required = schema.get("required")
+    if isinstance(required, list):
+        # Only keep required names we still have properties for.
+        kept = [r for r in required if r in cleaned["properties"]]
+        if kept:
+            cleaned["required"] = kept
+    return cleaned
+
+
 def load_mcp_config(path: Path) -> dict[str, dict]:
     """Parse mcp_servers.json -> {server_name: {command, args, env}}.
 
@@ -134,7 +166,10 @@ class MCPManager:
             self._tools.append({
                 "name": f"{name}{NAME_SEP}{tool.name}",
                 "description": f"[{name} app] {tool.description or tool.name}"[:1024],
-                "input_schema": tool.inputSchema or {"type": "object", "properties": {}},
+                # Some connectors (MS 365 / Graph, Canvas) ship tools whose
+                # top-level schema is a union, which the Anthropic API rejects
+                # and which 400s the whole turn. Normalise before sending.
+                "input_schema": sanitize_input_schema(tool.inputSchema),
             })
 
     # --- use -------------------------------------------------------------------
