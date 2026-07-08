@@ -9,11 +9,15 @@ idle, and exits on its own if the app goes away (state file stops updating).
 
 Run manually for a quick look:
     python -m app.ui.status_overlay --state-file data/status.json
+
+Or just prove it renders (cycles through the states, ignores the app):
+    python -m app.ui.status_overlay --demo
 """
 
 from __future__ import annotations
 
 import argparse
+import itertools
 import sys
 import time
 
@@ -32,48 +36,62 @@ POLL_MS = 150
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--state-file", required=True)
+    parser.add_argument("--state-file", help="JSON file the app writes its state to")
+    parser.add_argument("--demo", action="store_true",
+                        help="cycle through the states to check rendering, ignore the app")
     args = parser.parse_args(argv)
+    if not args.demo and not args.state_file:
+        parser.error("give --state-file, or --demo to just test rendering")
 
     try:
         import tkinter as tk
     except Exception as exc:  # tkinter missing (e.g. Linux without python3-tk)
-        print(f"status overlay: tkinter unavailable ({exc}); no indicator shown",
+        print(f"status overlay: tkinter unavailable ({exc}); no indicator shown.\n"
+              "On macOS/Homebrew: brew install python-tk  (match your python version).",
               file=sys.stderr)
         return 1
 
     root = tk.Tk()
     root.overrideredirect(True)          # borderless
     root.attributes("-topmost", True)    # float above everything
-    try:
-        root.attributes("-alpha", 0.92)
-    except tk.TclError:
-        pass
+    for attr in (("-alpha", 0.92), ("-type", "splash")):
+        try:
+            root.attributes(*attr)
+        except tk.TclError:
+            pass
 
     label = tk.Label(root, text="", font=("Helvetica", 15, "bold"),
                      fg="white", padx=16, pady=8)
     label.pack()
 
-    def place_top_right() -> None:
+    def show(state: str) -> None:
+        look = _LOOK.get(state)
+        if look is None:                 # idle / unknown -> hide the pill
+            root.withdraw()
+            return
+        text, colour = look
+        label.configure(text=text, bg=colour)
+        root.configure(bg=colour)
+        root.deiconify()
         root.update_idletasks()
         w = root.winfo_width()
         sw = root.winfo_screenwidth()
         root.geometry(f"+{sw - w - 24}+28")
+        root.lift()                      # macOS: make sure it comes to the front
+        root.attributes("-topmost", True)
+
+    demo_cycle = itertools.cycle(["listening", "thinking", "speaking", "armed"])
 
     def tick() -> None:
+        if args.demo:
+            show(next(demo_cycle))
+            root.after(1500, tick)
+            return
         state, ts = read_state(args.state_file)
         if ts and (time.time() - ts) > STALE_AFTER_S:
             root.destroy()               # parent app is gone — clean up
             return
-        look = _LOOK.get(state)
-        if look is None:                 # idle / unknown -> hide the pill
-            root.withdraw()
-        else:
-            text, colour = look
-            label.configure(text=text, bg=colour)
-            root.configure(bg=colour)
-            root.deiconify()
-            place_top_right()
+        show(state)
         root.after(POLL_MS, tick)
 
     root.withdraw()
