@@ -93,6 +93,23 @@ def test_needs_approval_rules():
     assert needs_approval("calendar__create_event")
     assert not needs_approval("gmail__search_emails")
     assert not needs_approval("gmail__read_email")
+    # Canvas / Outlook connectors use verbs the original Gmail-focused list
+    # didn't cover — these must be gated too, not slip through as "read-only".
+    assert needs_approval("canvas__bulk_grade_submissions")
+    assert needs_approval("canvas__submit_assignment")
+    assert needs_approval("canvas__edit_page_content")
+    assert needs_approval("canvas__upload_course_file")
+    assert needs_approval("canvas__add_module_item")
+    assert needs_approval("outlook__send_mail")
+    assert needs_approval("outlook__create_event")
+    assert not needs_approval("canvas__list_courses")
+    assert not needs_approval("canvas__get_assignment")
+    assert not needs_approval("outlook__list_messages")
+    # Word-boundary matching, not bare substring: these read-only tools contain
+    # a hint as a substring of a longer word and must NOT be gated.
+    assert not needs_approval("canvas__get_my_course_grades")  # "grades" != "grade"
+    assert not needs_approval("outlook__get_contact_address")  # "address" != "add"
+    assert not needs_approval("canvas__list_assignments")      # "assignments" != "assign"
 
 
 def test_describe_action_is_human_readable():

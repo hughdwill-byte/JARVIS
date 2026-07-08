@@ -97,16 +97,26 @@ LOCAL_TOOL_SCHEMAS = [
 
 # Local tools that always need a yes from the user.
 DANGEROUS_LOCAL = {"write_file", "run_command", "open_app"}
-# MCP tools are gated when their name implies a state change.
+# MCP tools are gated when their name implies a state change. Widened for
+# LMS/office-suite connectors (Canvas, Outlook/Microsoft 365): those expose
+# verbs like "grade", "submit", "edit", "upload", "assign" that the original
+# Gmail/Calendar-focused list didn't cover.
 _WRITEY_HINTS = ("send", "create", "delete", "update", "write", "move", "archive",
-                 "reply", "draft", "modify", "remove", "post", "trash", "label")
+                 "reply", "draft", "modify", "remove", "post", "trash", "label",
+                 "edit", "add", "upload", "submit", "grade", "assign", "publish",
+                 "unpublish", "enroll", "invite", "share", "grant", "revoke")
+# Matched as whole underscore-delimited words, not bare substrings: a plain
+# `in` check would false-positive on nouns that happen to contain a hint —
+# "grade" inside "get_my_course_grades" (a read-only tool), "add" inside
+# "get_contact_address", "assign" inside "get_assignment".
+_WRITEY_HINT_RE = re.compile(r"(?:^|_)(?:" + "|".join(_WRITEY_HINTS) + r")(?:_|$)")
 
 
 def needs_approval(tool_name: str) -> bool:
     if tool_name in DANGEROUS_LOCAL:
         return True
     if "__" in tool_name:  # an MCP app tool
-        return any(h in tool_name.split("__", 1)[1].lower() for h in _WRITEY_HINTS)
+        return _WRITEY_HINT_RE.search(tool_name.split("__", 1)[1].lower()) is not None
     return False
 
 

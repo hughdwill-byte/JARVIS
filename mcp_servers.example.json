@@ -20,6 +20,22 @@
       "args": ["-y", "@modelcontextprotocol/server-gdrive"]
     },
 
+    "outlook": {
+      "command": "npx",
+      "args": ["-y", "@softeria/ms-365-mcp-server", "--preset", "outlook"],
+      "_note": "Microsoft Graph: mail, calendar, contacts. First run: `npx @softeria/ms-365-mcp-server --login` in a terminal for the one-time device-code sign-in. University/work account? Add '--org-mode' to both this args list and the --login command. '--preset outlook' keeps the tool count sane (~dozens); avoid '--preset all' (200+ tools) unless you need Excel/OneNote/Teams too — every extra tool costs context on every turn. docs/COMPUTER_AND_APPS.md has the full walkthrough."
+    },
+
+    "canvas": {
+      "command": "npx",
+      "args": ["-y", "@r-huijts/canvas-mcp"],
+      "env": {
+        "CANVAS_API_TOKEN": "your_canvas_access_token",
+        "CANVAS_BASE_URL": "https://your-school.instructure.com"
+      },
+      "_note": "Get a token: Canvas -> Account -> Settings -> New Access Token. Set CANVAS_BASE_URL to YOUR school's Canvas domain, not the example above."
+    },
+
     "notion": {
       "command": "npx",
       "args": ["-y", "@notionhq/notion-mcp-server"],
