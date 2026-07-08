@@ -266,9 +266,10 @@ English. The important ones:
 - **Speaker & Voice output** — pick the output device and set speaking speed (160–190 feels
   most natural). **Voice engine** chooses the neural Kokoro voice (`auto`/`kokoro`) or the
   plain system voice; see *A more natural voice* above for the one-time `pip install kokoro`.
-  **Floating status light** turns on a small always-on-top pill (🎤 Listening / 💭 Thinking /
-  🔊 Speaking) in the top-right corner so you can tell JARVIS is working without watching the
-  app — a separate little window that works on macOS and Windows.
+  **Menu-bar status light** puts a small coloured dot in your menu bar / system tray (green
+  Listening, amber Thinking, blue Speaking) so you can tell JARVIS is working without watching
+  the app. It lives in the menu bar, so it never covers your screen or blocks clicks, and
+  hides when idle. One-time `pip install pystray`; works on macOS and Windows.
 - **Camera & Vision** — *Scan for cameras* finds what's plugged in; *Test camera* shows you
   exactly what JARVIS sees (use this to aim the camera). Also: how many days snapshots are
   kept (0 = delete right after analysis).

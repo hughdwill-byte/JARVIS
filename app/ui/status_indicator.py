@@ -1,11 +1,11 @@
 """Cross-platform 'is JARVIS working?' indicator.
 
-The app can't easily host a menu-bar icon (its desktop window owns the GUI
-thread), so instead JARVIS writes its current state — listening / thinking /
-speaking — to a tiny JSON file, and a *separate* little always-on-top window
-(app/ui/status_overlay.py, plain Tkinter, works on macOS and Windows) reads that
-file and shows a coloured pill. Running the overlay as its own process keeps it
-completely decoupled from the app: it can never freeze or crash the assistant.
+The app's desktop window owns the GUI thread, so JARVIS writes its current
+state — listening / thinking / speaking — to a tiny JSON file, and a *separate*
+process (app/ui/status_overlay.py) reads that file and shows a small coloured
+dot in the menu bar / system tray. Running it as its own process keeps it
+completely decoupled from the app (it can never freeze or crash the assistant)
+and, being a menu-bar item, it never covers the screen or blocks clicks.
 
 This module is the writer side: a background poller derives the state from
 things JARVIS already exposes (is the speaker talking? is the mic capturing an

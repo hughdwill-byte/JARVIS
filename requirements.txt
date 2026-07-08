@@ -44,6 +44,11 @@ pytesseract>=0.3.10
 # --- Desktop app window (optional; falls back to the browser) ---
 pywebview>=5.0            # native window for run_app.py (macOS WebKit / Windows WebView2)
 
+# --- Menu-bar status light (optional; STATUS_OVERLAY=true) ---
+# Puts a small coloured dot in the menu bar / system tray showing when JARVIS is
+# listening / thinking / speaking. Off unless you enable it in Settings.
+pystray>=0.19            # menu-bar / system-tray icon (uses Pillow, already above)
+
 # --- Tests ---
 pytest>=8.0.0
 

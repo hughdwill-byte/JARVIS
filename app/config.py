@@ -142,9 +142,10 @@ class Config:
     agent_context_cap_tokens: int = 12000
     mcp_config_path: Path = field(default_factory=lambda: PROJECT_ROOT / "mcp_servers.json")
 
-    # Floating status pill: a small always-on-top window (separate process) that
-    # shows Listening / Thinking / Speaking so you can tell JARVIS is working
-    # without watching the app. Cross-platform (Tkinter). Off by default.
+    # Menu-bar status light: a small coloured dot in the menu bar / system tray
+    # (separate process) showing Listening / Thinking / Speaking, so you can tell
+    # JARVIS is working without watching the app. Never covers the screen or
+    # blocks clicks. Cross-platform (pystray). Off by default.
     status_overlay: bool = False
 
     # Misc
