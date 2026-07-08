@@ -101,7 +101,9 @@ study workflows and PDF/project features, is **[docs/USER_GUIDE.md](docs/USER_GU
 ## What it can do
 
 - **Talk hands-free** — local wake-word detection ("jarvis"), local speech-to-text, offline
-  text-to-speech; `/stop` interrupts it mid-sentence.
+  text-to-speech; `/stop` interrupts it mid-sentence. Optional **Kokoro** neural voice for a
+  natural, still-free, still-offline upgrade (see *Nicer voice* below, then Settings → Voice
+  engine).
 - **See your desk** — `/desk` describe, `/look where are my keys?`, `/read` a held-up page,
   `/ocr` free local text reading, `/changes` what moved since last time.
 - **Remember, on your terms** — notes, tasks, reminders; long-term facts stored only via
@@ -188,9 +190,10 @@ data/                   created at runtime (DB, snapshots, logs) — gitignored,
 python -m pytest app/tests -q
 ```
 
-52 tests covering config, memory, tasks/reminders, scene memory, LLM fallback, documents,
-study tools, the voice loop, and the settings app. All pass with no camera, no mic, and no
-API key.
+The suite covers config, memory, tasks/reminders, scene memory, LLM fallback, documents,
+study tools, the voice loop (including Kokoro neural TTS selection/fallback), the agent
+planning + context-compaction logic, and the settings app. All pass with no camera, no mic,
+no speaker, and no API key.
 
 ## Privacy model
 
@@ -210,7 +213,52 @@ API key.
 ## What's next after setup
 
 1. Live with it for a week; tune wake sensitivity and voice speed in Settings.
-2. Nicer voice: `pip install edge-tts` (free Microsoft neural voices — swap noted in
-   [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#tts-sounds-robotic)).
+2. **Nicer voice (free, local, offline):** install `espeak-ng` (macOS:
+   `brew install espeak-ng`; Debian/Ubuntu/Pi: `sudo apt-get install espeak-ng`; Windows:
+   the installer from the [espeak-ng releases page](https://github.com/espeak-ng/espeak-ng/releases)),
+   then `pip install "kokoro>=0.9.4" soundfile` (the version pin matters — a bare
+   `pip install kokoro` can grab an unrelated older package of the same name). Open
+   Settings → Speaker & Voice output, set **Voice engine** to `auto` (or `kokoro`), and
+   pick a **Kokoro voice**. It's a big quality jump over the robotic OS voice; if it isn't
+   installed JARVIS just keeps using the system voice, so there's no risk. (Piper is still
+   supported too, and `pip install edge-tts` remains an option for Microsoft's online
+   voices — see [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#tts-sounds-robotic).)
 3. Bigger ideas: calendar integration, web search tool, a dedicated mini-PC or Pi so JARVIS
    is always on ([setup/setup_raspberry_pi.md](setup/setup_raspberry_pi.md)).
+
+## Attribution — sourced from OpenJarvis
+
+Some of the recent local-first upgrades draw on [OpenJarvis](https://github.com/open-jarvis/OpenJarvis)
+(Apache-2.0). Full details, with the Apache-2.0 license text and a per-file list, are in
+[`NOTICE`](NOTICE) and [`LICENSES/Apache-2.0.txt`](LICENSES/Apache-2.0.txt).
+
+**1. Directly adapted (code)** — original files carry an "Adapted from OpenJarvis" header:
+
+- **Kokoro neural TTS backend** — [`app/audio/kokoro_tts.py`](app/audio/kokoro_tts.py),
+  adapted from OpenJarvis
+  [`src/openjarvis/speech/kokoro_tts.py`](https://github.com/open-jarvis/OpenJarvis/blob/main/src/openjarvis/speech/kokoro_tts.py)
+  (registry decorator and backend abstraction stripped; rewired into JARVIS's existing
+  Speaker fallback chain, driven by `app/config.py`).
+
+**2. Patterns adapted (reimplemented, no code copied)** — studied for ideas only:
+
+- **Agent task decomposition + context compaction** — [`app/brain/planning.py`](app/brain/planning.py)
+  and the plan→act loop in [`app/brain/agent.py`](app/brain/agent.py), pattern-inspired by
+  OpenJarvis
+  [`agents/manager.py`](https://github.com/open-jarvis/OpenJarvis/blob/main/src/openjarvis/agents/manager.py),
+  [`agents/executor.py`](https://github.com/open-jarvis/OpenJarvis/blob/main/src/openjarvis/agents/executor.py),
+  [`agents/hybrid/mini_swe_agent.py`](https://github.com/open-jarvis/OpenJarvis/blob/main/src/openjarvis/agents/hybrid/mini_swe_agent.py),
+  and [`memory/extractor.py`](https://github.com/open-jarvis/OpenJarvis/blob/main/src/openjarvis/memory/extractor.py).
+  JARVIS's own safety model (folder allowlist, per-action approvals, untrusted-content
+  handling) is unchanged.
+
+Speech-to-text ([`app/audio/speech_to_text.py`](app/audio/speech_to_text.py)) already uses
+faster-whisper — the same engine OpenJarvis wraps — so no code was taken and no second STT
+stack was added; parity was confirmed and it was left as-is.
+
+## License
+
+This is a personal project with no public license — all rights reserved to the owner. The
+portions adapted from OpenJarvis remain Apache-2.0 regardless (see [`NOTICE`](NOTICE) and
+[`LICENSES/Apache-2.0.txt`](LICENSES/Apache-2.0.txt) for the required attribution), but that
+doesn't change the licensing status of the rest of the repository.

@@ -20,6 +20,30 @@
       "args": ["-y", "@modelcontextprotocol/server-gdrive"]
     },
 
+    "outlook": {
+      "command": "npx",
+      "args": ["-y", "@softeria/ms-365-mcp-server", "--preset", "outlook"],
+      "allowedTools": [
+        "list-mail-messages", "get-mail-message", "send-mail",
+        "create-draft-email", "delete-mail-message",
+        "list-calendar-events", "get-calendar-event", "create-calendar-event",
+        "update-calendar-event", "delete-calendar-event",
+        "get-outlook-contact", "create-outlook-contact",
+        "update-outlook-contact", "delete-outlook-contact"
+      ],
+      "_note": "Microsoft Graph: mail, calendar, contacts. First run: `npx @softeria/ms-365-mcp-server --login` in a terminal for the one-time device-code sign-in. University/work account? Add '--org-mode' to both this args list and the --login command. The optional 'allowedTools' list above trims the connector down to just these tools (fewer tools = less token cost per turn + no surprise actions) — delete the whole 'allowedTools' line to get the full preset back. docs/COMPUTER_AND_APPS.md has the full walkthrough."
+    },
+
+    "canvas": {
+      "command": "npx",
+      "args": ["-y", "@r-huijts/canvas-mcp"],
+      "env": {
+        "CANVAS_API_TOKEN": "your_canvas_access_token",
+        "CANVAS_BASE_URL": "https://your-school.instructure.com"
+      },
+      "_note": "Get a token: Canvas -> Account -> Settings -> New Access Token. Set CANVAS_BASE_URL to YOUR school's Canvas domain, not the example above."
+    },
+
     "notion": {
       "command": "npx",
       "args": ["-y", "@notionhq/notion-mcp-server"],

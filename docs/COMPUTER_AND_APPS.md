@@ -6,8 +6,8 @@ going until the task is done. Two kinds of tools are available to it:
 
 1. **Your computer** (built in): list folders, read files, write files, run shell commands,
    open apps/URLs.
-2. **Your apps** (via MCP): Gmail, Google Calendar, Notion, and hundreds more — the same
-   connector ecosystem Claude uses.
+2. **Your apps** (via MCP): Gmail, Google Calendar, Outlook/Microsoft 365, Canvas LMS,
+   Notion, and hundreds more — the same connector ecosystem Claude uses.
 
 ```
 tidy my Downloads folder into subfolders by file type
@@ -72,6 +72,53 @@ Apps connect through **MCP servers** — the open standard behind Claude's conne
 
 Where to find more servers: the same MCP directories the Claude community uses —
 search "<app name> MCP server". Anything that runs over stdio works.
+
+### Outlook / Microsoft 365
+
+Uses [`@softeria/ms-365-mcp-server`](https://github.com/softeria/ms-365-mcp-server)
+(Microsoft Graph API — mail, calendar, contacts).
+
+1. Keep the `outlook` entry in `mcp_servers.json` (it's pre-filled in the example with
+   `--preset outlook`, which limits it to mail/calendar/contacts — the full `--preset all`
+   exposes 200+ tools across Excel/OneNote/Teams/etc., and every extra tool adds context
+   cost on every turn, so don't switch to it unless you actually need those apps).
+2. **One-time sign-in**, in a terminal:
+   ```bash
+   npx @softeria/ms-365-mcp-server --login
+   ```
+   This opens a device-code flow in your browser (no Azure app registration needed for
+   personal use).
+3. **University/work account?** (most student Outlook addresses are this) Add `--org-mode`
+   to *both* the `--login` command above and the `args` list in `mcp_servers.json`.
+4. Restart JARVIS, then `/apps` should list `outlook`. Try: `/agent check my Outlook inbox
+   for anything from my tutor this week`.
+
+**Trimming a connector to just the tools you want.** Any server entry in
+`mcp_servers.json` can take an optional `"allowedTools"` list — JARVIS then exposes only
+those tools out of everything the server offers. Fewer tools means less token cost on every
+turn and no surprise capabilities. The example's `outlook` entry ships with a 14-tool
+allowlist (core mail/calendar/contacts); delete the `"allowedTools"` line to get the full
+preset back. Names are matched loosely (case and `-`/`_` don't matter), and if one matches
+nothing JARVIS logs a warning so you can spot a typo.
+
+### Canvas LMS
+
+Uses [`@r-huijts/canvas-mcp`](https://github.com/r-huijts/canvas-mcp) (courses,
+assignments, grades, announcements, modules).
+
+1. In Canvas: **Account → Settings → New Access Token**. Copy it immediately — Canvas
+   only shows it once.
+2. In `mcp_servers.json`, set `CANVAS_API_TOKEN` to that token and `CANVAS_BASE_URL` to
+   **your own school's Canvas address** (e.g. `https://yourschool.instructure.com`) — the
+   example value is a placeholder, not a real default.
+3. Restart JARVIS, then `/apps` should list `canvas`. Try: `/agent what assignments do I
+   have due this week on Canvas?`
+4. The token only sees what your Canvas account can see — a student account can't grade or
+   publish anything a student couldn't do in the Canvas web UI either.
+
+Whatever your Canvas access level, any tool that changes something (grading, submitting,
+editing a page, uploading a file, posting an announcement) still goes through the same
+approval-prompt safety model described above — same as sending a Gmail message.
 
 **Privacy note:** app connections run locally on your machine; your credentials stay in
 the server's own auth files. But remember email *content* fetched during a task is sent to

@@ -34,6 +34,7 @@ from app.brain.llm_client import (
     record_api_usage,
     web_search_tool,
 )
+from app.brain.planning import compact_messages, plan_steps
 from app.config import Config
 from app.logger import get_logger
 from app.prompts import (
@@ -96,16 +97,26 @@ LOCAL_TOOL_SCHEMAS = [
 
 # Local tools that always need a yes from the user.
 DANGEROUS_LOCAL = {"write_file", "run_command", "open_app"}
-# MCP tools are gated when their name implies a state change.
+# MCP tools are gated when their name implies a state change. Widened for
+# LMS/office-suite connectors (Canvas, Outlook/Microsoft 365): those expose
+# verbs like "grade", "submit", "edit", "upload", "assign" that the original
+# Gmail/Calendar-focused list didn't cover.
 _WRITEY_HINTS = ("send", "create", "delete", "update", "write", "move", "archive",
-                 "reply", "draft", "modify", "remove", "post", "trash", "label")
+                 "reply", "draft", "modify", "remove", "post", "trash", "label",
+                 "edit", "add", "upload", "submit", "grade", "assign", "publish",
+                 "unpublish", "enroll", "invite", "share", "grant", "revoke")
+# Matched as whole underscore-delimited words, not bare substrings: a plain
+# `in` check would false-positive on nouns that happen to contain a hint —
+# "grade" inside "get_my_course_grades" (a read-only tool), "add" inside
+# "get_contact_address", "assign" inside "get_assignment".
+_WRITEY_HINT_RE = re.compile(r"(?:^|_)(?:" + "|".join(_WRITEY_HINTS) + r")(?:_|$)")
 
 
 def needs_approval(tool_name: str) -> bool:
     if tool_name in DANGEROUS_LOCAL:
         return True
     if "__" in tool_name:  # an MCP app tool
-        return any(h in tool_name.split("__", 1)[1].lower() for h in _WRITEY_HINTS)
+        return _WRITEY_HINT_RE.search(tool_name.split("__", 1)[1].lower()) is not None
     return False
 
 
@@ -237,15 +248,29 @@ class Agent:
         if not self.llm.available:
             return ("Agent mode needs the LLM — add your Anthropic API key in "
                     "Settings -> AI Brain and press Save & Apply.")
+        # Plan -> act: decompose the task into a short ordered plan first, then
+        # work through it. Cheap (one smart-model call), best-effort, and hands
+        # the model a scaffold that keeps long multi-step tasks on track.
+        # (Pattern adapted from OpenJarvis — see app/brain/planning.py.)
+        dynamic = current_datetime_line()
+        if self.cfg.agent_planning:
+            steps = plan_steps(self.llm, task, self.cfg.llm_model_smart)
+            if steps:
+                on_action("  [agent] plan:")
+                for i, step in enumerate(steps, 1):
+                    on_action(f"    {i}. {step}")
+                plan_text = "\n".join(f"{i}. {s}" for i, s in enumerate(steps, 1))
+                dynamic += ("\n\n--- YOUR PLAN ---\nWork through these steps, adapting as "
+                            "you learn. Don't narrate the plan back to the user.\n" + plan_text)
         final, actions = self._loop(
             messages=[{"role": "user", "content": task}],
-            system=cached_system(AGENT_SYSTEM_PROMPT, current_datetime_line()),
+            system=cached_system(AGENT_SYSTEM_PROMPT, dynamic),
             # Smart model floor; a deep-hinted task ("in-depth report") gets
             # the deep model instead.
             model=self.llm.pick_model(task, force_smart=True),
             on_action=on_action,
         )
-        return self._with_action_log(final, actions)
+        return self._with_action_log(final, actions, self.cfg.agent_show_actions)
 
     def run_conversation(
         self,
@@ -285,6 +310,12 @@ class Agent:
 
         can_stream = on_sentence is not None and hasattr(client.messages, "stream")
         for _step in range(self.cfg.agent_max_steps):
+            # Keep long multi-step runs inside the context window: compact stale
+            # tool observations once the transcript grows past the budget. A
+            # no-op on ordinary short turns. (Pattern adapted from OpenJarvis —
+            # see app/brain/planning.py.)
+            messages = compact_messages(
+                messages, cap_tokens=self.cfg.agent_context_cap_tokens)
             # Deep work (reports) needs room to write; everyday steps stay capped.
             max_tokens = max_tokens_for(self.cfg, model, 2048)
             started = time.monotonic()
@@ -363,8 +394,10 @@ class Agent:
                 "content": result[:OUTPUT_CAP], "is_error": is_error}
 
     @staticmethod
-    def _with_action_log(final: str, actions: list[str]) -> str:
+    def _with_action_log(final: str, actions: list[str], show: bool = True) -> str:
         if not actions:
             return final or "Done — nothing needed doing."
+        if not show:
+            return final or "Done."
         log_lines = "\n".join(f"  - {a}" for a in actions)
         return f"{final or 'Done.'}\n\nActions taken:\n{log_lines}"

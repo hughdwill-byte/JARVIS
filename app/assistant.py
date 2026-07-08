@@ -36,6 +36,7 @@ from app.tools.project_files import ProjectTool
 from app.tools.reminders import ReminderManager
 from app.tools.study_tools import StudyTools, integrity_check
 from app.tools.tasks import TaskManager
+from app.ui.status_indicator import StatusIndicator
 from app.vision.camera import Camera, CameraError
 from app.vision.image_analyzer import ImageAnalyzer, split_summary_and_objects
 from app.vision.ocr import read_image_text
@@ -86,6 +87,11 @@ class Assistant:
 
         # Hands-free mode: created here, started by the front-end (run_assistant).
         self.voice_loop = VoiceLoop(self) if cfg.wake_word_enabled else None
+
+        # Visible "JARVIS is working" pill (separate always-on-top process).
+        # Inert unless STATUS_OVERLAY is on; safe to drive from any thread.
+        self.status = StatusIndicator(cfg, self.speaker, lambda: self.voice_loop)
+        self.status.start()
 
         # Agent mode (computer use + connected apps). Connected-app servers start
         # in the background at boot so normal conversation can use them right away.
@@ -400,7 +406,11 @@ class Assistant:
             self.speaker.stop()
             return Reply("Stopped.", speak=False)
         with self._handle_lock:  # voice thread and terminal/dashboard can't overlap
-            return self._handle_inner(user_text, on_sentence)
+            self.status.set_thinking(True)
+            try:
+                return self._handle_inner(user_text, on_sentence)
+            finally:
+                self.status.set_thinking(False)
 
     def _handle_inner(self, user_text: str, on_sentence=None) -> Reply:
 
@@ -463,7 +473,7 @@ class Assistant:
                 final, actions = self.llm.chat(user_text, history=history,
                                                context_block=context), []
             reply_text = final
-            if actions:
+            if actions and self.cfg.agent_show_actions:
                 reply_text += "\n\nActions taken:\n" + "\n".join(f"  - {a}" for a in actions)
                 speak_text = final  # don't read the action log aloud
         elif (self.cfg.agent_enabled and self.llm.available
@@ -484,5 +494,6 @@ class Assistant:
     def close(self) -> None:
         if self.voice_loop is not None:
             self.voice_loop.shutdown_thread()
+        self.status.close()
         self.speaker.stop()
         self.db.close()

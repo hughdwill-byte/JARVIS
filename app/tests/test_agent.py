@@ -93,6 +93,23 @@ def test_needs_approval_rules():
     assert needs_approval("calendar__create_event")
     assert not needs_approval("gmail__search_emails")
     assert not needs_approval("gmail__read_email")
+    # Canvas / Outlook connectors use verbs the original Gmail-focused list
+    # didn't cover — these must be gated too, not slip through as "read-only".
+    assert needs_approval("canvas__bulk_grade_submissions")
+    assert needs_approval("canvas__submit_assignment")
+    assert needs_approval("canvas__edit_page_content")
+    assert needs_approval("canvas__upload_course_file")
+    assert needs_approval("canvas__add_module_item")
+    assert needs_approval("outlook__send_mail")
+    assert needs_approval("outlook__create_event")
+    assert not needs_approval("canvas__list_courses")
+    assert not needs_approval("canvas__get_assignment")
+    assert not needs_approval("outlook__list_messages")
+    # Word-boundary matching, not bare substring: these read-only tools contain
+    # a hint as a substring of a longer word and must NOT be gated.
+    assert not needs_approval("canvas__get_my_course_grades")  # "grades" != "grade"
+    assert not needs_approval("outlook__get_contact_address")  # "address" != "add"
+    assert not needs_approval("canvas__list_assignments")      # "assignments" != "assign"
 
 
 def test_describe_action_is_human_readable():
@@ -307,25 +324,71 @@ def test_agent_run_uses_deep_model_for_heavy_tasks(agent_cfg):
     """'/agent write an in-depth report...' runs on the deep model, start to finish."""
     cfg, ws = agent_cfg
     agent, client = _agent_with(cfg, [
+        # calls[0] = the up-front planning call (cheap smart model)
+        SimpleNamespace(content=[_text('["read draft A", "read draft B", "compare"]')],
+                        stop_reason="end_turn"),
         SimpleNamespace(content=[_tool_use("list_dir", {"path": str(ws)})],
                         stop_reason="tool_use"),
         SimpleNamespace(content=[_text("Report done.")], stop_reason="end_turn"),
     ])
     agent.run("write an in-depth report comparing my two project drafts")
-    assert client.calls[0]["model"] == cfg.llm_model_deep
-    # tool use must NOT downgrade the deep run to the smart model
+    # planning stays on the cheap smart model even for a deep task…
+    assert client.calls[0]["model"] == cfg.llm_model_smart
+    # …but the task loop itself runs on the deep model, start to finish
     assert client.calls[1]["model"] == cfg.llm_model_deep
+    # tool use must NOT downgrade the deep run to the smart model
+    assert client.calls[2]["model"] == cfg.llm_model_deep
     # and deep work gets a report-sized reply budget
     from app.brain.llm_client import DEEP_MAX_TOKENS
-    assert client.calls[0]["max_tokens"] == DEEP_MAX_TOKENS
+    assert client.calls[1]["max_tokens"] == DEEP_MAX_TOKENS
+
+
+def test_agent_run_hides_action_log_when_disabled(agent_cfg):
+    cfg, ws = agent_cfg
+    cfg.agent_show_actions = False
+    agent, _client = _agent_with(cfg, [
+        SimpleNamespace(content=[_text('["look"]')], stop_reason="end_turn"),   # plan
+        SimpleNamespace(content=[_tool_use("list_dir", {"path": str(ws)})],
+                        stop_reason="tool_use"),
+        SimpleNamespace(content=[_text("All done.")], stop_reason="end_turn"),
+    ])
+    out = agent.run("tidy the folder")
+    assert "All done." in out
+    assert "Actions taken" not in out
+
+
+def test_agent_run_shows_action_log_by_default(agent_cfg):
+    cfg, ws = agent_cfg
+    agent, _client = _agent_with(cfg, [
+        SimpleNamespace(content=[_text('["look"]')], stop_reason="end_turn"),   # plan
+        SimpleNamespace(content=[_tool_use("list_dir", {"path": str(ws)})],
+                        stop_reason="tool_use"),
+        SimpleNamespace(content=[_text("All done.")], stop_reason="end_turn"),
+    ])
+    out = agent.run("tidy the folder")
+    assert "Actions taken" in out
 
 
 def test_agent_run_uses_smart_model_for_ordinary_tasks(agent_cfg):
     cfg, _ws = agent_cfg
     agent, client = _agent_with(cfg, [
+        SimpleNamespace(content=[_text('["open the folder"]')], stop_reason="end_turn"),
         SimpleNamespace(content=[_text("Done.")], stop_reason="end_turn"),
     ])
     agent.run("tidy my workspace folder")
+    assert client.calls[0]["model"] == cfg.llm_model_smart  # planning
+    assert client.calls[1]["model"] == cfg.llm_model_smart  # task loop
+
+
+def test_agent_run_without_planning_skips_the_plan_call(agent_cfg):
+    """AGENT_PLANNING=false → no up-front plan call, straight into the loop."""
+    cfg, _ws = agent_cfg
+    cfg.agent_planning = False
+    agent, client = _agent_with(cfg, [
+        SimpleNamespace(content=[_text("Done.")], stop_reason="end_turn"),
+    ])
+    agent.run("tidy my workspace folder")
+    assert len(client.calls) == 1
     assert client.calls[0]["model"] == cfg.llm_model_smart
 
 
@@ -409,10 +472,12 @@ def test_stop_preempts_without_the_lock(cfg):
 
 
 def test_agent_config_defaults(monkeypatch):
-    for var in ("AGENT_ENABLED", "AGENT_AUTO_APPROVE", "AGENT_ALLOWED_DIRS", "AGENT_MAX_STEPS"):
+    for var in ("AGENT_ENABLED", "AGENT_AUTO_APPROVE", "AGENT_ALLOWED_DIRS",
+                "AGENT_MAX_STEPS", "AGENT_SHOW_ACTIONS"):
         monkeypatch.delenv(var, raising=False)
     c = load_config(env_file="/nonexistent/.env")
     assert c.agent_enabled is True
     assert c.agent_auto_approve is False  # safe default: always ask
     assert c.agent_allowed_dirs == "~"
     assert c.agent_max_steps == 15
+    assert c.agent_show_actions is True

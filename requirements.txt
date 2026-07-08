@@ -18,6 +18,22 @@ soundfile>=0.12.0         # decode TTS audio for specific-speaker routing
 # --- Speech-to-text (optional; enables push-to-talk) ---
 faster-whisper>=1.0.0     # local Whisper STT (CPU-friendly "base"/"small" models)
 
+# --- Neural voice output (optional; TTS_ENGINE=kokoro/auto) ---
+# Kokoro is a fully open-source, local, FREE neural TTS — a big quality jump
+# over the robotic OS voice, no internet and no per-use cost. If it's not
+# installed JARVIS falls back to the system voice, so this is safe to skip.
+# Backend adapted from OpenJarvis (Apache-2.0); see NOTICE and README.
+# Left commented (like edge-tts below) because it pulls in torch — a large
+# download that would bloat every install (including Raspberry Pi). To enable:
+#   1) install the espeak-ng system binary first (Kokoro's phonemizer needs
+#      it): macOS `brew install espeak-ng`; Debian/Ubuntu/Pi
+#      `sudo apt-get install espeak-ng`; Windows: the espeak-ng installer from
+#      https://github.com/espeak-ng/espeak-ng/releases
+#   2) pip install "kokoro>=0.9.4" soundfile
+#      (the version pin matters — plain `pip install kokoro` can resolve to an
+#      unrelated older package of the same name)
+# kokoro>=0.9.4           # local neural text-to-speech (downloads torch + a voice model)
+
 # --- Hands-free wake word ("jarvis") ---
 openwakeword>=0.6.0       # local wake-word detection
 onnxruntime>=1.16.0       # inference backend (works on macOS incl. Apple Silicon)
@@ -27,6 +43,11 @@ pytesseract>=0.3.10
 
 # --- Desktop app window (optional; falls back to the browser) ---
 pywebview>=5.0            # native window for run_app.py (macOS WebKit / Windows WebView2)
+
+# --- Menu-bar status light (optional; STATUS_OVERLAY=true) ---
+# Puts a small coloured dot in the menu bar / system tray showing when JARVIS is
+# listening / thinking / speaking. Off unless you enable it in Settings.
+pystray>=0.19            # menu-bar / system-tray icon (uses Pillow, already above)
 
 # --- Tests ---
 pytest>=8.0.0

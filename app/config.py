@@ -97,6 +97,15 @@ class Config:
     tts_rate: int = 180
     tts_voice: str = ""  # system voice id; "" = OS default (pick in Settings)
     speaker_device_index: int | None = None  # None = system default output
+    # Voice engine selector, layered on top of tts_provider:
+    #   auto   = use Kokoro neural voice if the package is installed, else the
+    #            system/piper voice (the default — no behaviour change until you
+    #            `pip install kokoro`)
+    #   kokoro = force the Kokoro neural voice (falls back to the OS voice if the
+    #            package is missing, so it can never make JARVIS mute)
+    #   system = never use Kokoro; keep the current piper/pyttsx3/`say` path
+    tts_engine: str = "auto"
+    kokoro_voice: str = "af_heart"  # Kokoro voice id (see AVAILABLE_VOICES)
     # Piper: natural, offline neural TTS (TTS_PROVIDER=piper). Needs the piper
     # binary on PATH and a downloaded voice model (.onnx). Falls back to the OS
     # voice if either is missing, so turning it on can never make JARVIS mute.
@@ -121,7 +130,23 @@ class Config:
     agent_max_steps: int = 15
     agent_auto_approve: bool = False
     agent_allowed_dirs: str = "~"  # comma-separated folders the agent may touch
+    # Show the "Actions taken:" list appended to agent replies. Purely cosmetic
+    # (it's built locally and never spoken — costs no tokens); off = tidier.
+    agent_show_actions: bool = True
+    # Explicit up-front task decomposition before a /agent task runs (a short
+    # plan the model then works through). Patterns adapted from OpenJarvis.
+    agent_planning: bool = True
+    # Soft context budget for one agent run: when the running transcript is
+    # estimated to exceed this, stale tool observations are compacted so long
+    # multi-step tasks don't blow the context window. 0 disables compaction.
+    agent_context_cap_tokens: int = 12000
     mcp_config_path: Path = field(default_factory=lambda: PROJECT_ROOT / "mcp_servers.json")
+
+    # Menu-bar status light: a small coloured dot in the menu bar / system tray
+    # (separate process) showing Listening / Thinking / Speaking, so you can tell
+    # JARVIS is working without watching the app. Never covers the screen or
+    # blocks clicks. Cross-platform (pystray). Off by default.
+    status_overlay: bool = False
 
     # Misc
     debug: bool = False
@@ -199,6 +224,8 @@ def load_config(env_file: str | os.PathLike | None = None) -> Config:
         tts_rate=_int(os.getenv("TTS_RATE"), 180),
         tts_voice=os.getenv("TTS_VOICE", "").strip(),
         speaker_device_index=_opt_int(os.getenv("SPEAKER_DEVICE_INDEX")),
+        tts_engine=os.getenv("TTS_ENGINE", "auto").strip().lower() or "auto",
+        kokoro_voice=os.getenv("KOKORO_VOICE", "af_heart").strip() or "af_heart",
         piper_binary=os.getenv("PIPER_BINARY", "piper").strip() or "piper",
         piper_voice_model=os.getenv("PIPER_VOICE_MODEL", "").strip(),
         piper_speaker=_opt_int(os.getenv("PIPER_SPEAKER")),
@@ -212,7 +239,11 @@ def load_config(env_file: str | os.PathLike | None = None) -> Config:
         agent_max_steps=_int(os.getenv("AGENT_MAX_STEPS"), 15),
         agent_auto_approve=_bool(os.getenv("AGENT_AUTO_APPROVE"), False),
         agent_allowed_dirs=os.getenv("AGENT_ALLOWED_DIRS", "~").strip() or "~",
+        agent_show_actions=_bool(os.getenv("AGENT_SHOW_ACTIONS"), True),
+        agent_planning=_bool(os.getenv("AGENT_PLANNING"), True),
+        agent_context_cap_tokens=_int(os.getenv("AGENT_CONTEXT_CAP_TOKENS"), 12000),
         mcp_config_path=Path(os.getenv("MCP_CONFIG_PATH", "").strip() or PROJECT_ROOT / "mcp_servers.json"),
+        status_overlay=_bool(os.getenv("STATUS_OVERLAY"), False),
         debug=_bool(os.getenv("DEBUG"), False),
         projects_dir=Path(projects_dir_raw) if projects_dir_raw else None,
     )
