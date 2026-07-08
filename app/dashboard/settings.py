@@ -165,6 +165,11 @@ SETTINGS_SCHEMA: list[dict] = [
             {"key": "TTS_RATE", "label": "Speaking speed (words/min)", "type": "slider",
              "min": 120, "max": 230, "step": 5,
              "help": "160–190 sounds most natural."},
+            {"key": "STATUS_OVERLAY", "label": "Floating status light", "type": "toggle",
+             "help": "Shows a small always-on-top pill (🎤 Listening / 💭 Thinking / "
+                     "🔊 Speaking) in the top-right of your screen so you can tell JARVIS "
+                     "is working without watching the app. Separate little window, works "
+                     "on macOS and Windows. Takes effect after Save & Apply."},
         ],
     },
     {

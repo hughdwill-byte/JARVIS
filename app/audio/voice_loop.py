@@ -297,29 +297,34 @@ class VoiceLoop(threading.Thread):
         voiced_s = 0.0
         chunk_s = CHUNK_SAMPLES / SAMPLE_RATE
         waited = 0.0
-        while True:
-            chunk, _ = stream.read(CHUNK_SAMPLES)
-            audio = chunk[:, 0].astype(np.float32) / 32768.0
-            rms = float(np.sqrt(np.mean(audio ** 2)))
-            if not started:
-                waited += chunk_s
+        # Light up the "Listening" pill while we're actually capturing you.
+        self.assistant.status.set_recording(True)
+        try:
+            while True:
+                chunk, _ = stream.read(CHUNK_SAMPLES)
+                audio = chunk[:, 0].astype(np.float32) / 32768.0
+                rms = float(np.sqrt(np.mean(audio ** 2)))
+                if not started:
+                    waited += chunk_s
+                    if rms >= SPEECH_RMS:
+                        started = True
+                        voiced_s = chunk_s
+                        chunks.append(audio)
+                    elif waited >= start_timeout:
+                        return None
+                    continue
+                chunks.append(audio)
                 if rms >= SPEECH_RMS:
-                    started = True
-                    voiced_s = chunk_s
-                    chunks.append(audio)
-                elif waited >= start_timeout:
-                    return None
-                continue
-            chunks.append(audio)
-            if rms >= SPEECH_RMS:
-                voiced_s += chunk_s
-                silence_run = 0.0
-            else:
-                silence_run += chunk_s
-            if silence_run >= END_SILENCE_S or len(chunks) * chunk_s >= MAX_UTTERANCE_S:
-                if voiced_s < MIN_VOICED_S:
-                    return None  # a blip, not speech — don't even transcribe it
-                return np.concatenate(chunks)
+                    voiced_s += chunk_s
+                    silence_run = 0.0
+                else:
+                    silence_run += chunk_s
+                if silence_run >= END_SILENCE_S or len(chunks) * chunk_s >= MAX_UTTERANCE_S:
+                    if voiced_s < MIN_VOICED_S:
+                        return None  # a blip, not speech — don't even transcribe it
+                    return np.concatenate(chunks)
+        finally:
+            self.assistant.status.set_recording(False)
 
     def _drain(self, stream) -> None:
         """Discard audio that piled up while we were transcribing/answering."""

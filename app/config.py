@@ -142,6 +142,11 @@ class Config:
     agent_context_cap_tokens: int = 12000
     mcp_config_path: Path = field(default_factory=lambda: PROJECT_ROOT / "mcp_servers.json")
 
+    # Floating status pill: a small always-on-top window (separate process) that
+    # shows Listening / Thinking / Speaking so you can tell JARVIS is working
+    # without watching the app. Cross-platform (Tkinter). Off by default.
+    status_overlay: bool = False
+
     # Misc
     debug: bool = False
     projects_dir: Path | None = None
@@ -237,6 +242,7 @@ def load_config(env_file: str | os.PathLike | None = None) -> Config:
         agent_planning=_bool(os.getenv("AGENT_PLANNING"), True),
         agent_context_cap_tokens=_int(os.getenv("AGENT_CONTEXT_CAP_TOKENS"), 12000),
         mcp_config_path=Path(os.getenv("MCP_CONFIG_PATH", "").strip() or PROJECT_ROOT / "mcp_servers.json"),
+        status_overlay=_bool(os.getenv("STATUS_OVERLAY"), False),
         debug=_bool(os.getenv("DEBUG"), False),
         projects_dir=Path(projects_dir_raw) if projects_dir_raw else None,
     )
