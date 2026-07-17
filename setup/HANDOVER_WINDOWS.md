@@ -95,12 +95,25 @@ sounddevice, faster-whisper, openwakeword, onnxruntime, pytesseract, pywebview, 
 
 Both are gitignored, so they only exist on your Mac:
 
-1. **`data/jarvis.db`** — your notes, tasks, reminders and long-term memories. Copy it from
+1. **`.env`** — your Anthropic API key and settings.
+2. **`mcp_servers.json`** — your connected-apps + their tokens (see table above).
+3. **`data/jarvis.db`** — your notes, tasks, reminders and long-term memories. Copy it from
    `~/JARVIS/data/jarvis.db` on the Mac into the new `JARVIS\data\` folder (the installer can
    import it for you when asked). Skip it for a clean start.
-2. **`mcp_servers.json`** — your connected-apps + their tokens (see table above).
 
 Everything else is regenerated automatically.
+
+### Easy way to bundle these on the Mac
+
+Double-click **`launchers/make-secrets-zip.command`** in your Mac's JARVIS folder. It builds a
+**password-protected** `jarvis-secrets.zip` on your Desktop containing whatever exists (`.env`,
+`mcp_servers.json`, any Google OAuth file, and — if you want — `data/jarvis.db`). Send that zip to
+the new PC and unzip it **into the `JARVIS` folder** (`.env` + `mcp_servers.json` at the root,
+`jarvis.db` in `data\`), replacing what the installer created. Delete the zip afterwards.
+
+> Safer alternative: don't move `.env` at all — just recreate the Anthropic key at
+> console.anthropic.com and paste it into the installer's hidden prompt. Then the zip only needs
+> `mcp_servers.json` and `data/jarvis.db`.
 
 ---
 
