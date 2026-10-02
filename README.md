@@ -36,24 +36,24 @@ On a computer with [Python 3.10+](https://python.org) and [Git](https://git-scm.
 ```bash
 git clone https://github.com/hughdwill-byte/JARVIS JARVIS && cd JARVIS
 python3 -m venv .venv
-source .venv/bin/activate          
-pip install -r requirements.txt
-python run_app.py                   
-```
-To just launch an updated version after updates launch:
-
-```bash
-cd ~/JARVIS
-source .venv/bin/activate
-git stash
-git pull
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 python run_app.py
 ```
-Another Launch Method
+
+**Launching again later:**
 
 ```bash
-source .venv/bin/activate && python run_app.py
+cd JARVIS && source .venv/bin/activate && python run_app.py
+```
+
+**Updating to the latest version:**
+
+```bash
+cd JARVIS && source .venv/bin/activate
+git pull
+pip install -r requirements.txt
+python run_app.py
 ```
 
 Then, **inside the app**:
@@ -104,8 +104,12 @@ study workflows and PDF/project features, is **[docs/USER_GUIDE.md](docs/USER_GU
   text-to-speech; `/stop` interrupts it mid-sentence.
 - **See your desk** — `/desk` describe, `/look where are my keys?`, `/read` a held-up page,
   `/ocr` free local text reading, `/changes` what moved since last time.
-- **Remember, on your terms** — notes, tasks, reminders; long-term facts stored only via
-  `/remember`, listed with `/memories`, deleted with `/forget`.
+- **Remember, on your terms**: notes, tasks and reminders. Long-term facts are stored only
+  when you use `/remember`, listed with `/memories`, and deleted with `/forget`. Say *"good
+  morning"* (or use `/briefing`) for a free, offline daily briefing.
+- **Your personal knowledge base**: `/index` embeds your notes, memories and Obsidian vault
+  locally. `/ask` then answers questions from that material only, with `[n]` citations.
+  `/export` mirrors everything to Markdown/Obsidian.
 - **Help you study** — `/plan` assignment milestones, `/flashcards`, `/explain`,
   `/timetable`, `/cite`, `/doc` PDF summaries + follow-up Q&A.
 - **Help you build** — `/project` loads a code folder for Q&A, `/code` debugs with
@@ -118,6 +122,9 @@ study workflows and PDF/project features, is **[docs/USER_GUIDE.md](docs/USER_GU
   calendar, … via MCP) automatically, step by step — with approval prompts before anything
   risky, a folder allowlist, and an "Actions taken" log on every reply. Setup & safety
   model: [docs/COMPUTER_AND_APPS.md](docs/COMPUTER_AND_APPS.md).
+- **Keep an eye on cost & speed**: `/usage` shows token usage and estimated spend per model,
+  and `/voicestats` shows speech-to-text and text-to-speech latency. Local-first mode routes
+  everyday chat to [Ollama](https://ollama.com) for free.
 
 **What it won't do:** write assignments/essays for submission, answer quizzes or exams, or
 help disguise AI work as yours. It's a tutor, not a ghostwriter — it declines and offers the
@@ -169,12 +176,14 @@ app/
   assistant.py          core: wires everything, registers all /commands
   config.py             settings loader (.env) with safe defaults
   prompts.py            JARVIS persona + vision prompts + integrity rules
-  audio/                voice_loop (wake word), push_to_talk, STT, TTS
+  audio/                voice_loop, wake_word, push_to_talk, STT, TTS, latency
   vision/               camera, image_analyzer, ocr, scene_memory
-  brain/                llm_client (model routing), router, agent (computer use),
-                        mcp_client (connected apps), tool_manager
+  brain/                llm_client (model routing), ollama_client (local-first), router,
+                        agent (computer use), mcp_client (connected apps), tool_manager,
+                        rag + embeddings (knowledge base), usage (cost tracking)
   memory/               database (SQLite), notes, preferences
-  tools/                tasks, reminders, documents, project_files, study_tools, code_helper
+  tools/                tasks, reminders, documents, project_files, study_tools, code_helper,
+                        briefing, vault_export
   dashboard/            the app UI: chat page, settings page, device tests
   tests/                pytest suite (runs with zero devices and zero keys)
 setup/                  per-OS install guides
@@ -188,9 +197,9 @@ data/                   created at runtime (DB, snapshots, logs) — gitignored,
 python -m pytest app/tests -q
 ```
 
-52 tests covering config, memory, tasks/reminders, scene memory, LLM fallback, documents,
-study tools, the voice loop, and the settings app. All pass with no camera, no mic, and no
-API key.
+More than 120 tests cover config, memory, tasks and reminders, scene memory, LLM fallback
+and providers, local-first routing, RAG, the computer-use agent, documents, study tools, the
+voice loop and the settings app. They all pass with no camera, no mic and no API key.
 
 ## Privacy model
 
@@ -212,5 +221,7 @@ API key.
 1. Live with it for a week; tune wake sensitivity and voice speed in Settings.
 2. Nicer voice: `pip install edge-tts` (free Microsoft neural voices — swap noted in
    [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#tts-sounds-robotic)).
-3. Bigger ideas: calendar integration, web search tool, a dedicated mini-PC or Pi so JARVIS
-   is always on ([setup/setup_raspberry_pi.md](setup/setup_raspberry_pi.md)).
+3. Connect more apps (Gmail, calendar, …) through MCP: copy `mcp_servers.example.json` and
+   see [docs/COMPUTER_AND_APPS.md](docs/COMPUTER_AND_APPS.md).
+4. Go always-on with a dedicated mini-PC or Raspberry Pi
+   ([setup/setup_raspberry_pi.md](setup/setup_raspberry_pi.md)).
